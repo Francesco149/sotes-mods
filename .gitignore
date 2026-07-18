@@ -1,0 +1,11 @@
+# build artifacts (mods that compile native code)
+/build/
+**/obj/
+*.o
+*.a
+*.dll
+*.exe
+
+# editor / OS cruft
+.DS_Store
+*.swp

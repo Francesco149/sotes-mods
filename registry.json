@@ -1,0 +1,28 @@
+{
+  "registry_version": 1,
+  "source": {
+    "name": "sotes-mods",
+    "description": "Francesco149's mods for Fortune Summoners: the EN-SE trainer and the Japanese voice patch. This is the default source shipped with the SotES Mod Loader.",
+    "homepage": "https://github.com/Francesco149/sotes-mods",
+    "maintainer": "Francesco149"
+  },
+  "_note": "The mod-loader-based versions of these mods are being ported (loader phases P6/P7). Until the first release lands, versions[] is empty (nothing installable yet) and the metadata below is the launcher's development target. Schema: sotes-mod-loader/docs/REGISTRY.md.",
+  "mods": [
+    {
+      "id": "ennse_voice",
+      "name": "Japanese Voice Patch (EN-SE)",
+      "description": "Restores the Japanese dialogue voices in the English Special Edition. English text, Japanese spoken lines; the exe is never modified. You supply sotesx_s.dll from your own Japanese copy.",
+      "keywords": ["voice", "japanese", "audio", "dialogue", "ense", "jp"],
+      "target_games": ["sotes_en"],
+      "versions": []
+    },
+    {
+      "id": "sotes_trainer",
+      "name": "EN-SE Trainer",
+      "description": "Debug/trainer mod: teleport, god mode, map graph, portal warps, dialogue skip, and a Dear ImGui UI. Built for RE and testing.",
+      "keywords": ["trainer", "cheat", "teleport", "god", "map", "warp", "debug"],
+      "target_games": ["sotes_en"],
+      "versions": []
+    }
+  ]
+}
