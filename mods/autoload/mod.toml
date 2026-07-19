@@ -1,0 +1,18 @@
+[mod]
+id          = "autoload"
+name        = "Auto-Load Save"
+version     = "1.0.0"
+description = "Skip the title/menu straight into a save on launch, by driving the menus via the loader's mod.game.save op."
+authors     = ["Francesco149"]
+target_games = ["sotes_en"]
+
+[loader]
+min_version = "0.1.0"
+
+[config.slot]
+type        = "int"
+default     = -1
+min         = -1
+max         = 20
+label       = "Save slot"
+description = "Which save to auto-load. -1 = the picker's newest/default save."

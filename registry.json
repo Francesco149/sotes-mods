@@ -9,6 +9,14 @@
   "_note": "The mod-loader-based versions of these mods are being ported (loader phases P6/P7). Until the first release lands, versions[] is empty (nothing installable yet) and the metadata below is the launcher's development target. Schema: sotes-mod-loader/docs/REGISTRY.md.",
   "mods": [
     {
+      "id": "autoload",
+      "name": "Auto-Load Save",
+      "description": "Skip the title/menu straight into a save on launch. Drives the menus via the loader's mod.game.save op; the save slot is a mod config setting (mod.toml [config]). Formerly the loader's built-in autoload flag, now a mod.",
+      "keywords": ["autoload", "save", "boot", "quickstart", "qol"],
+      "target_games": ["sotes_en"],
+      "versions": []
+    },
+    {
       "id": "ennse_voice",
       "name": "Japanese Voice Patch (EN-SE)",
       "description": "Restores the Japanese dialogue voices in the English Special Edition. English text, Japanese spoken lines; the exe is never modified. You supply sotesx_s.dll from your own Japanese copy.",

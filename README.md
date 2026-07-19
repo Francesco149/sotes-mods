@@ -13,6 +13,7 @@ hashes; the launcher then verifies every downloaded file against the pinned `sha
 
 | id | name | what |
 |---|---|---|
+| `autoload` | Auto-Load Save | Launch straight into a save (config: `slot`). Orchestrates the loader's `mod.game.save` op. |
 | `ennse_voice` | Japanese Voice Patch (EN-SE) | English text + Japanese dialogue voices. You supply `sotesx_s.dll` from your own JP copy. |
 | `sotes_trainer` | EN-SE Trainer | Teleport / god / map graph / warps / dialogue-skip + a Dear ImGui UI. |
 
