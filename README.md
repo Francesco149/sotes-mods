@@ -19,10 +19,22 @@ hashes; the launcher then verifies every downloaded file against the pinned `sha
 
 ## Status
 
-The mod-loader-based versions are being **ported** from their originals in
-`../OpenSummoners/tools/{ennse_voice,sotes_trainer}` (loader phases P6/P7). Until the
-first release lands, `registry.json`'s `versions[]` are empty — the metadata is in place
-so the launcher can be developed against a real source.
+**WIP.** `autoload` has its first loader-based release (`autoload-1.0.0`); `ennse_voice`
+and `sotes_trainer` are still being **ported** from their originals in
+`../OpenSummoners/tools/{ennse_voice,sotes_trainer}`, so their `registry.json` `versions[]`
+stay empty until released.
+
+## Releases
+
+Each mod version is published as a **GitHub release** on this repo, tagged `<id>-<version>`
+(e.g. `autoload-1.0.0`), with the mod's files (`init.lua`, `mod.toml`, …) as the release
+assets. `registry.json` points each version's `files[]` at those assets and pins their
+`sha256`, so the launcher verifies every download against the hash it trusts.
+
+This repo is both the **source** and the **registry**, but they're independent: a download
+`url` can point anywhere, so another mod dev may keep a repo as a **registry only** and host
+the mod source + files elsewhere (any GitHub release or CDN). You trust the registry you add;
+the pinned hashes guarantee integrity regardless of who hosts the bytes.
 
 ## Layout
 

@@ -6,7 +6,7 @@
     "homepage": "https://github.com/Francesco149/sotes-mods",
     "maintainer": "Francesco149"
   },
-  "_note": "The mod-loader-based versions of these mods are being ported (loader phases P6/P7). Until the first release lands, versions[] is empty (nothing installable yet) and the metadata below is the launcher's development target. Schema: sotes-mod-loader/docs/REGISTRY.md.",
+  "_note": "autoload has its first loader-based release (tag autoload-1.0.0, assets hosted on this repo's GitHub releases); ennse_voice + sotes_trainer are still being ported, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
   "mods": [
     {
       "id": "autoload",
@@ -14,7 +14,31 @@
       "description": "Skip the title/menu straight into a save on launch. Drives the menus via the loader's mod.game.save op; the save slot is a mod config setting (mod.toml [config]). Formerly the loader's built-in autoload flag, now a mod.",
       "keywords": ["autoload", "save", "boot", "quickstart", "qol"],
       "target_games": ["sotes_en"],
-      "versions": []
+      "versions": [
+        {
+          "version": "1.0.0",
+          "released": "2026-07-19",
+          "notes": "First loader-based release. Auto-loads a save at boot via the loader's mod.game.save op; the save slot is configurable ([config] slot, -1 = the picker's newest save).",
+          "min_loader": "0.1.0",
+          "requires": {},
+          "files": [
+            {
+              "kind": "download",
+              "dest": "mods/autoload/init.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/autoload-1.0.0/init.lua",
+              "sha256": "1cae65de18831aa6682edd75e6d0eb3a5fcda9bcf0e8dffcd757d3a8e74d985a",
+              "size": 821
+            },
+            {
+              "kind": "download",
+              "dest": "mods/autoload/mod.toml",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/autoload-1.0.0/mod.toml",
+              "sha256": "2173b5eb404109c1fd1f19104211af858392fccd104cbfdded3fe925d5c1de67",
+              "size": 600
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "ennse_voice",
