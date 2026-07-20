@@ -6,7 +6,7 @@
     "homepage": "https://github.com/Francesco149/sotes-mods",
     "maintainer": "Francesco149"
   },
-  "_note": "autoload has its first loader-based release (tag autoload-1.0.0, assets hosted on this repo's GitHub releases); dashboard is source-ready (mods/dashboard/) and ennse_voice + sotes_trainer are still being ported, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
+  "_note": "autoload and dashboard have loader-based releases (tags autoload-1.0.0, dashboard-1.0.0, assets hosted on this repo's GitHub releases); ennse_voice + sotes_trainer are still being ported, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
   "mods": [
     {
       "id": "autoload",
@@ -46,7 +46,31 @@
       "description": "The stock loader UI: lists every built-in mod.game.* module with an enable/disable toggle (a crash valve), persisted across launches, plus live readouts of their data (roster stats, ...). A default-enabled mod so the loader core stays lightweight.",
       "keywords": ["ui", "dashboard", "modules", "toggle", "roster", "stock", "qol"],
       "target_games": ["sotes_en"],
-      "versions": []
+      "versions": [
+        {
+          "version": "1.0.0",
+          "released": "2026-07-20",
+          "notes": "First release. The stock loader UI: every built-in mod.game.* module with an enable/disable toggle (persisted to mod.config) + a live roster readout.",
+          "min_loader": "0.1.0",
+          "requires": {},
+          "files": [
+            {
+              "kind": "download",
+              "dest": "mods/dashboard/init.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/dashboard-1.0.0/init.lua",
+              "sha256": "5ec5950a2787717cbbb121395be8f7057b397edbc07507f475735999b06c96b5",
+              "size": 3887
+            },
+            {
+              "kind": "download",
+              "dest": "mods/dashboard/mod.toml",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/dashboard-1.0.0/mod.toml",
+              "sha256": "4a201c3715b3a6f911a544a3432850f76d46227a4ed67402fae81a896de1af77",
+              "size": 768
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "ennse_voice",

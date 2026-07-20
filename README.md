@@ -20,10 +20,10 @@ hashes; the launcher then verifies every downloaded file against the pinned `sha
 
 ## Status
 
-**WIP.** `autoload` has its first loader-based release (`autoload-1.0.0`). `dashboard` is
-source-ready (`mods/dashboard/`) and `ennse_voice` + `sotes_trainer` are still being
-**ported** from their originals in `../OpenSummoners/tools/{ennse_voice,sotes_trainer}`, so
-their `registry.json` `versions[]` stay empty until released.
+**WIP.** `autoload` and `dashboard` have loader-based releases (`autoload-1.0.0`,
+`dashboard-1.0.0`); `ennse_voice` + `sotes_trainer` are still being **ported** from their
+originals in `../OpenSummoners/tools/{ennse_voice,sotes_trainer}`, so their `registry.json`
+`versions[]` stay empty until released.
 
 ## Releases
 
