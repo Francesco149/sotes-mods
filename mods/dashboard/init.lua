@@ -37,7 +37,7 @@ else
   mod.log("dashboard: mod.game unavailable (not a SotES target?) — nothing to show")
 end
 
--- ── panel: the module toggles ────────────────────────────────────────────────────────────────────
+-- ── panel: the module toggles (collapsed by default — it's a long list you rarely touch) ──────────
 ui.panel("Modules", function()
   if not (game and game.list) then ui.text_disabled("mod.game unavailable on this target"); return end
   ui.text("Built-in loader modules — untick one if it misbehaves:")
@@ -52,7 +52,7 @@ ui.panel("Modules", function()
     end
     if m.desc and m.desc ~= "" then ui.text_disabled("    " .. m.desc) end
   end
-end)
+end, true)   -- 3rd arg = collapsed by default
 
 -- ── panel: live roster readout (an example of surfacing a module's data) ──────────────────────────
 ui.panel("Roster", function()
