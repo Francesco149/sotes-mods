@@ -70,8 +70,9 @@ ui.panel("Roster", function()
     ui.text_disabled(string.format("    Lv %d   (combat %d / adventurer %d)",
       m.char_level, m.combat_level, m.adventurer_level))
     ui.text_disabled(string.format("    hp %d/%d   mp %d/%d", m.hp, m.hp_max, m.mp, m.mp_max))
-    ui.text_disabled(string.format("    atk %d   def %d   spi %d   res %d",
-      m.attack, m.defense, m.spirit, m.resist))
+    -- stats as the status screen shows them: effective (with equipment) / base
+    ui.text_disabled(string.format("    atk %d/%d   def %d/%d", m.attack, m.attack_base, m.defense, m.defense_base))
+    ui.text_disabled(string.format("    spi %d/%d   res %d/%d", m.spirit, m.spirit_base, m.resist, m.resist_base))
     ui.text_disabled(string.format("    exp %d/%d   pos (%d, %d)", m.exp, m.exp_max, m.x, m.y))
   end
 end)
