@@ -13,16 +13,17 @@ hashes; the launcher then verifies every downloaded file against the pinned `sha
 
 | id | name | what |
 |---|---|---|
+| `dashboard` | Loader Dashboard | The **stock loader UI**: every built-in `mod.game.*` module with an enable/disable toggle (a crash valve), persisted, + live roster stats. Recommended default. |
 | `autoload` | Auto-Load Save | Launch straight into a save (config: `slot`). Orchestrates the loader's `mod.game.save` op. |
 | `ennse_voice` | Japanese Voice Patch (EN-SE) | English text + Japanese dialogue voices. You supply `sotesx_s.dll` from your own JP copy. |
 | `sotes_trainer` | EN-SE Trainer | Teleport / god / map graph / warps / dialogue-skip + a Dear ImGui UI. |
 
 ## Status
 
-**WIP.** `autoload` has its first loader-based release (`autoload-1.0.0`); `ennse_voice`
-and `sotes_trainer` are still being **ported** from their originals in
-`../OpenSummoners/tools/{ennse_voice,sotes_trainer}`, so their `registry.json` `versions[]`
-stay empty until released.
+**WIP.** `autoload` has its first loader-based release (`autoload-1.0.0`). `dashboard` is
+source-ready (`mods/dashboard/`) and `ennse_voice` + `sotes_trainer` are still being
+**ported** from their originals in `../OpenSummoners/tools/{ennse_voice,sotes_trainer}`, so
+their `registry.json` `versions[]` stay empty until released.
 
 ## Releases
 

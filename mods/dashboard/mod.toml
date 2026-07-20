@@ -1,0 +1,17 @@
+[mod]
+id          = "dashboard"
+name        = "Loader Dashboard"
+version     = "1.0.0"
+description = "The stock loader UI: every built-in mod.game.* module listed with an enable/disable toggle (a crash valve), persisted across launches, plus live readouts of their data (roster stats, ...)."
+authors     = ["Francesco149"]
+target_games = ["sotes_en"]
+
+[loader]
+api         = "1.0"       # mod API this mod targets (MAJOR.MINOR); the loader refuses an incompatible major
+min_version = "0.1.0"
+
+[config.disabled]
+type        = "string"
+default     = ""
+label       = "Disabled modules"
+description = "Comma-separated ids of built-in modules turned OFF from the dashboard. Managed by the UI — edit by hand only to disable a module that crashes before the UI can open."

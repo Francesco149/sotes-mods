@@ -6,7 +6,7 @@
     "homepage": "https://github.com/Francesco149/sotes-mods",
     "maintainer": "Francesco149"
   },
-  "_note": "autoload has its first loader-based release (tag autoload-1.0.0, assets hosted on this repo's GitHub releases); ennse_voice + sotes_trainer are still being ported, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
+  "_note": "autoload has its first loader-based release (tag autoload-1.0.0, assets hosted on this repo's GitHub releases); dashboard is source-ready (mods/dashboard/) and ennse_voice + sotes_trainer are still being ported, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
   "mods": [
     {
       "id": "autoload",
@@ -39,6 +39,14 @@
           ]
         }
       ]
+    },
+    {
+      "id": "dashboard",
+      "name": "Loader Dashboard",
+      "description": "The stock loader UI: lists every built-in mod.game.* module with an enable/disable toggle (a crash valve), persisted across launches, plus live readouts of their data (roster stats, ...). A default-enabled mod so the loader core stays lightweight.",
+      "keywords": ["ui", "dashboard", "modules", "toggle", "roster", "stock", "qol"],
+      "target_games": ["sotes_en"],
+      "versions": []
     },
     {
       "id": "ennse_voice",
