@@ -1,8 +1,8 @@
--- trainer — cheats + sandbox over the loader's mod.game ops (api 1.2), every edition.
+-- trainer — cheats + sandbox over the loader's mod.game ops (api 1.3), every edition.
 --
 -- Nothing here pokes the game by hand: god / heal = roster.set, teleport = coordinates.set, warp =
 -- map.warp (the warp item's own request), items = items.give (the game's own room_item_add), gold =
--- items.set_gold.  UI callbacks and on_frame run on the engine thread, where those writes are allowed.
+-- items.set_gold, dialogue skip = dialogue.skip (the game's own held-TAB skip).  UI callbacks and on_frame run on the engine thread, where those writes are allowed.
 
 local ui, game, cfg = mod.ui, mod.game, mod.config
 local ffi = require('ffi')
@@ -26,6 +26,8 @@ local function teleport_to_cursor()
   say(ok and ("teleported to %d, %d"):format(m.world_x, m.world_y) or ("teleport: " .. tostring(why)))
 end
 mod.on_frame(function()
+  local skip = cfg.get("skip_dialogue") and true or false
+  if skip ~= select(1, game.dialogue.get()) then game.dialogue.skip(skip) end
   if cfg.get("god") then
     for _, m in ipairs(party()) do
       if m.hp < m.hp_max or m.mp < m.mp_max then game.roster.set(m.code, { hp = m.hp_max, mp = m.mp_max }) end
@@ -43,6 +45,8 @@ ui.panel("Trainer", function()
   ui.text(("room %d (map %d)%s"):format(mp.area, mp.map or -1, game.map.event() and "   [event running]" or ""))
   local god, ch = ui.checkbox("God mode (HP / MP stay full)", cfg.get("god"))
   if ch then cfg.set("god", god) end
+  local sk, ch2 = ui.checkbox("Skip dialogue (holds TAB during events)", cfg.get("skip_dialogue"))
+  if ch2 then cfg.set("skip_dialogue", sk) end
   if ui.button("Heal party") then
     for _, m in ipairs(party()) do game.roster.set(m.code, { hp = m.hp_max, mp = m.mp_max }) end
     say("party healed")
@@ -123,6 +127,7 @@ end, true)
 -- ── the agent API: _G.trainer (the dev server's `lua`, other mods) — same actions as the panels ──────
 _G.trainer = {
   god = function(on) if on ~= nil then cfg.set("god", on and true or false) end return cfg.get("god") end,
+  skip_dialogue = function(on) if on ~= nil then cfg.set("skip_dialogue", on and true or false) end return cfg.get("skip_dialogue") end,
   force_warp = function(on) if on ~= nil then cfg.set("force_warp", on and true or false) end return cfg.get("force_warp") end,
   heal = function() for _, m in ipairs(party()) do game.roster.set(m.code, { hp = m.hp_max, mp = m.mp_max }) end return true end,
   warp = function(key, gate) return game.map.warp(key, gate or 0, cfg.get("force_warp")) end,
