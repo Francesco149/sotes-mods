@@ -1,0 +1,31 @@
+[mod]
+id          = "trainer"
+name        = "Trainer"
+version     = "0.1.0"
+description = "Cheats + sandbox for every edition (2012 EN, Special Edition EN / JP): god mode, heal, gold, teleport to the cursor (F7), warp to any room, give any item. Each action is the game's own mechanism, exposed by the loader's mod.game ops."
+authors     = ["Francesco149"]
+target_games = ["sotes_en"]
+
+[loader]
+api         = "1.2"       # map.warp / rooms, items.give / catalog, roster.set, coordinates.set
+min_version = "0.1.0"
+
+[config.god]
+type        = "bool"
+default     = false
+label       = "God mode"
+description = "Keep every party member's HP and MP at their maximum."
+
+[config.force_warp]
+type        = "bool"
+default     = true
+label       = "Force warps"
+description = "Warp from anywhere, instantly. Off = the warp item's own rules and dissolve (not in towns, events or rooms that forbid it)."
+
+[config.teleport_key]
+type        = "int"
+default     = 118
+min         = 1
+max         = 254
+label       = "Teleport key (VK)"
+description = "Virtual-key code that teleports the controlled member to the mouse cursor (default 118 = F7)."

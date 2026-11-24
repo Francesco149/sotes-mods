@@ -6,7 +6,7 @@
     "homepage": "https://github.com/Francesco149/sotes-mods",
     "maintainer": "Francesco149"
   },
-  "_note": "autoload and dashboard have loader-based releases (tags autoload-1.0.0, dashboard-1.0.0, assets hosted on this repo's GitHub releases); ennse_voice + sotes_trainer are still being ported, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
+  "_note": "autoload and dashboard have loader-based releases (tags autoload-1.0.0, dashboard-1.0.0, assets hosted on this repo's GitHub releases); ennse_voice is still being ported and trainer (mods/trainer) is unreleased, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
   "mods": [
     {
       "id": "autoload",
@@ -81,10 +81,10 @@
       "versions": []
     },
     {
-      "id": "sotes_trainer",
-      "name": "EN-SE Trainer",
-      "description": "Debug/trainer mod: teleport, god mode, map graph, portal warps, dialogue skip, and a Dear ImGui UI. Built for RE and testing.",
-      "keywords": ["trainer", "cheat", "teleport", "god", "map", "warp", "debug"],
+      "id": "trainer",
+      "name": "Trainer",
+      "description": "Cheats + sandbox for every edition (2012 EN, SE EN / JP): god mode, heal, gold, teleport to the cursor, warp to any room, give any item. Each is the game's own mechanism via the loader's mod.game ops (api 1.2). Replaces the injected EN-SE trainer.",
+      "keywords": ["trainer", "cheat", "teleport", "god", "warp", "items", "sandbox", "debug"],
       "target_games": ["sotes_en"],
       "versions": []
     }

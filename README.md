@@ -16,14 +16,14 @@ hashes; the launcher then verifies every downloaded file against the pinned `sha
 | `dashboard` | Loader Dashboard | The **stock loader UI**: every built-in `mod.game.*` module with an enable/disable toggle (a crash valve), persisted, + live roster stats. Recommended default. |
 | `autoload` | Auto-Load Save | Launch straight into a save (config: `slot`). Orchestrates the loader's `mod.game.save` op. |
 | `ennse_voice` | Japanese Voice Patch (EN-SE) | English text + Japanese dialogue voices. You supply `sotesx_s.dll` from your own JP copy. |
-| `sotes_trainer` | EN-SE Trainer | Teleport / god / map graph / warps / dialogue-skip + a Dear ImGui UI. |
+| `trainer` | Trainer | God mode / heal / gold / teleport to the cursor (F7) / warp to any room / give any item, every edition — over the loader's sandbox ops (api 1.2). Panels in the loader UI; `_G.trainer` for agents. Unreleased (0.1.0). |
 
 ## Status
 
 **WIP.** `autoload` and `dashboard` have loader-based releases (`autoload-1.0.0`,
-`dashboard-1.0.0`); `ennse_voice` + `sotes_trainer` are still being **ported** from their
-originals in `../OpenSummoners/tools/{ennse_voice,sotes_trainer}`, so their `registry.json`
-`versions[]` stay empty until released.
+`dashboard-1.0.0`); `ennse_voice` is still being **ported** from `../OpenSummoners/tools/ennse_voice`; `trainer`
+(the v2 rewrite of `../OpenSummoners/tools/sotes_trainer`) is in `mods/trainer` — both keep
+`registry.json` `versions[]` empty until released.
 
 ## Releases
 
