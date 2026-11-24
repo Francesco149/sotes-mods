@@ -82,6 +82,7 @@ local function warp(key)
   local ok, why = game.map.warp(key, 0, cfg.get("force_warp"))
   say(ok and ("warp → %d"):format(key) or tostring(why))
 end
+local map_labels   -- combo_search labels for maps[] (built once)
 ui.panel("Warp", function()
   local mp = game.map.get()
   if not mp then ui.text_disabled("no scene"); return end
@@ -99,8 +100,13 @@ ui.panel("Warp", function()
   end
   ui.spacing()
   ui.separator()
-  map_i = select(1, ui.slider_int("map", map_i, 1, #maps))
-  local m = maps[map_i]
+  map_labels = map_labels or (function()
+    local t = {}
+    for i, m in ipairs(maps) do t[i] = ("map %d  (%d rooms)"):format(m, #rooms_by_map[m]) end
+    return t
+  end)()
+  map_i = select(1, ui.combo_search("map", map_labels, map_i))
+  local m = maps[map_i] or maps[1]
   ui.text(("map %d: %d rooms"):format(m, #rooms_by_map[m]))
   for i, k in ipairs(rooms_by_map[m]) do
     if ui.small_button(tostring(k)) then warp(k) end
@@ -109,14 +115,17 @@ ui.panel("Warp", function()
 end, true)
 
 -- ── panel: items ──────────────────────────────────────────────────────────────────────────────────
-local cat, item_i, count = nil, 1, 1
+local cat, cat_labels, item_i, count = nil, nil, 1, 1
 ui.panel("Items", function()
   if not game.map.get() then ui.text_disabled("no scene"); return end
   cat = cat or game.items.catalog()
   if not (cat and #cat > 0) then ui.text_disabled("no item catalog on this build"); return end
-  item_i = select(1, ui.slider_int("item", item_i, 1, #cat))
-  local it = cat[item_i]
-  ui.text(("%d  %s"):format(it.id, it.name))
+  if not cat_labels then
+    cat_labels = {}
+    for i, it in ipairs(cat) do cat_labels[i] = ("%d  %s"):format(it.id, it.name) end
+  end
+  item_i = select(1, ui.combo_search("item", cat_labels, item_i))
+  local it = cat[item_i] or cat[1]
   count = select(1, ui.slider_int("count (0 = default)", count, 0, 99))
   if ui.button("Give") then
     local idx, why = game.items.give(it.id, count)
@@ -126,7 +135,7 @@ ui.panel("Items", function()
 end, true)
 
 -- ── panel: spawn — any character code the edition's char_init takes, placed ahead of the leader ──────
-local acat, act_i, ahead = nil, 1, 60
+local acat, acat_labels, act_i, ahead = nil, nil, 1, 60
 local function spawn(code, dx)
   local slot, why = game.actors.spawn(code, { dx = (dx or ahead) * 100 })
   say(slot and ("spawned %d (slot %d)"):format(code, slot) or tostring(why))
@@ -136,11 +145,16 @@ ui.panel("Spawn", function()
   if not game.map.get() then ui.text_disabled("no scene"); return end
   acat = acat or game.actors.catalog()
   if not (acat and #acat > 0) then ui.text_disabled("no character codes for this build"); return end
-  act_i = select(1, ui.slider_int("code", act_i, 1, #acat))
-  local c = acat[act_i]
-  -- ImGui text is UTF-8 (no CJK glyphs): ense-jp's names are Shift-JIS, so the English column there
-  local nm = (mod.edition == "ense-jp" and c.en) or c.name or c.en
-  ui.text(("%d  %s"):format(c.code, nm or "(no name: a townsperson / prop)"))
+  if not acat_labels then
+    -- ImGui text is UTF-8 (no CJK glyphs): ense-jp's names are Shift-JIS, so the English column there
+    acat_labels = {}
+    for i, c in ipairs(acat) do
+      local nm = (mod.edition == "ense-jp" and c.en) or c.name or c.en
+      acat_labels[i] = ("%d  %s"):format(c.code, nm or "(no name: townsperson / prop)")
+    end
+  end
+  act_i = select(1, ui.combo_search("character", acat_labels, act_i))
+  local c = acat[act_i] or acat[1]
   ahead = select(1, ui.slider_int("ahead of the leader (px)", ahead, -320, 320))
   if ui.button("Spawn") then spawn(c.code) end
   ui.separator()
