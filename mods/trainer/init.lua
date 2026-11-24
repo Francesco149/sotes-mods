@@ -1,8 +1,9 @@
--- trainer — cheats + sandbox over the loader's mod.game ops (api 1.3), every edition.
+-- trainer — cheats + sandbox over the loader's mod.game ops (api 1.4), every edition.
 --
 -- Nothing here pokes the game by hand: god / heal = roster.set, teleport = coordinates.set, warp =
 -- map.warp (the warp item's own request), items = items.give (the game's own room_item_add), gold =
--- items.set_gold, dialogue skip = dialogue.skip (the game's own held-TAB skip).  UI callbacks and on_frame run on the engine thread, where those writes are allowed.
+-- items.set_gold, dialogue skip = dialogue.skip (the game's own held-TAB skip), spawn / despawn = actors.spawn /
+-- remove (the game's own summon_spawn / char_unload; codes limited to what the edition's char_init takes).  UI callbacks and on_frame run on the engine thread, where those writes are allowed.
 
 local ui, game, cfg = mod.ui, mod.game, mod.config
 local ffi = require('ffi')
@@ -124,6 +125,37 @@ ui.panel("Items", function()
   ui.text_disabled(("inventory: %d records"):format(#(game.items.list() or {})))
 end, true)
 
+-- ── panel: spawn — any character code the edition's char_init takes, placed ahead of the leader ──────
+local acat, act_i, ahead = nil, 1, 60
+local function spawn(code, dx)
+  local slot, why = game.actors.spawn(code, { dx = (dx or ahead) * 100 })
+  say(slot and ("spawned %d (slot %d)"):format(code, slot) or tostring(why))
+  return slot, why
+end
+ui.panel("Spawn", function()
+  if not game.map.get() then ui.text_disabled("no scene"); return end
+  acat = acat or game.actors.catalog()
+  if not (acat and #acat > 0) then ui.text_disabled("no character codes for this build"); return end
+  act_i = select(1, ui.slider_int("code", act_i, 1, #acat))
+  local c = acat[act_i]
+  -- ImGui text is UTF-8 (no CJK glyphs): ense-jp's names are Shift-JIS, so the English column there
+  local nm = (mod.edition == "ense-jp" and c.en) or c.name or c.en
+  ui.text(("%d  %s"):format(c.code, nm or "(no name: a townsperson / prop)"))
+  ahead = select(1, ui.slider_int("ahead of the leader (px)", ahead, -320, 320))
+  if ui.button("Spawn") then spawn(c.code) end
+  ui.separator()
+  local live, n = game.actors.list() or {}, 0
+  for _, a in ipairs(live) do
+    if a.spawned then
+      n = n + 1
+      if ui.small_button(("remove##%d"):format(a.slot)) then game.actors.remove(a.slot) end
+      ui.same_line()
+      ui.text(("slot %d: %d"):format(a.slot, a.code))
+    end
+  end
+  ui.text_disabled(("%d characters in the room, %d spawned here"):format(#live, n))
+end, true)
+
 -- ── the agent API: _G.trainer (the dev server's `lua`, other mods) — same actions as the panels ──────
 _G.trainer = {
   god = function(on) if on ~= nil then cfg.set("god", on and true or false) end return cfg.get("god") end,
@@ -133,6 +165,8 @@ _G.trainer = {
   warp = function(key, gate) return game.map.warp(key, gate or 0, cfg.get("force_warp")) end,
   teleport_cursor = teleport_to_cursor,
   give = function(id, n) return game.items.give(id, n or 0) end,
+  spawn = function(code, dx) return spawn(code, dx) end,   -- dx in px ahead of the leader (default: the panel's)
+  despawn = function(slot) return game.actors.remove(slot) end,
   last = function() return msg end,
 }
 

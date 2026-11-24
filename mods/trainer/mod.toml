@@ -2,12 +2,12 @@
 id          = "trainer"
 name        = "Trainer"
 version     = "0.1.0"
-description = "Cheats + sandbox for every edition (2012 EN, Special Edition EN / JP): god mode, heal, gold, dialogue skip, teleport to the cursor (F7), warp to any room, give any item. Each action is the game's own mechanism, exposed by the loader's mod.game ops."
+description = "Cheats + sandbox for every edition (2012 EN, Special Edition EN / JP): god mode, heal, gold, dialogue skip, teleport to the cursor (F7), warp to any room, give any item, spawn any character. Each action is the game's own mechanism, exposed by the loader's mod.game ops."
 authors     = ["Francesco149"]
 target_games = ["sotes_en"]
 
 [loader]
-api         = "1.3"       # map.warp / rooms, items.give / catalog, roster.set, coordinates.set, dialogue.skip
+api         = "1.4"       # map.warp / rooms, items.give / catalog, roster.set, coordinates.set, dialogue.skip, actors
 min_version = "0.1.0"
 
 [config.god]
