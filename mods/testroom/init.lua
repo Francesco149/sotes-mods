@@ -522,8 +522,7 @@ end
 local function bit_tick()
   local p = bit.ptr
   if not p then return end
-  if bit.mode == "dance" then return bit_dance(p) end
-  if bit.mode ~= "patrol" or mod.game.map.event() then return end
+  if bit.mode ~= "patrol" then return end
   local c = bit_clips()
   if bit.wait > 0 then
     bit.wait = bit.wait - 1
@@ -549,7 +548,7 @@ local function hall_tick()
     local b = by_handle(H.BIT)                             -- his look / clips / name came with his type (BIT_CODE)
     if b then bit.ptr, bit.home, bit.dir, bit.wait, bit.mode = b.ptr, b.x, 1, 120, "patrol" end
   end
-  bit_tick()
+  if bit.ptr and bit.mode == "dance" then bit_dance(bit.ptr) end   -- during the talk event: per frame, on the clock
 end
 
 S.on_talk(H.BIT, function(s)
@@ -704,7 +703,8 @@ local function install()
   assert(mod.game.map.set_exit(ARENA, 3, HALL, 2))
   make_sounds()
   define_types()
-  mod.on_frame(function() hall_tick() arena_tick() end)
+  mod.on_frame(hall_tick)                                -- looks: as soon as a room is up, events included
+  S.on_tick(function() bit_tick() arena_tick() end)      -- what moves or counts: the game's own 60 Hz tick
   mod.log(("testroom: house %d B, hall %d B (DATA %d), arena %d B (DATA %d)"):format(#house, #hall, HALL_MAP, #ar, ARENA_MAP))
 end
 
