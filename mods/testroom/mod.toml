@@ -1,11 +1,11 @@
 [mod]
 id          = "testroom"
 name        = "Test Room"
-version     = "0.4.0"
+version     = "0.4.1"
 description = "Proof of concept: a new door in Arche's house leads to the Mod Hall — a custom room built from stock tiles where NPCs and a bookshelf drive the game's own systems from Lua (choices, shop, inn, storage, books, warps, synthesized sounds) — plus custom sprites: a recoloured NPC, Bit (a new character with his own sprite sheet and animations) and the Glitch Cube (a new monster with its own sheet and Lua behaviours) in a custom arena. Exercises mod.res, map.add_room / set_exit, mod.game.script / sound and mod.game.sprites."
 authors     = ["Francesco149"]
 target_games = ["sotes_en"]
 
 [loader]
-api         = "1.10"
+api         = "1.11"
 min_version = "0.1.0"

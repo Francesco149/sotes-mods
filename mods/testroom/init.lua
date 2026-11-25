@@ -135,10 +135,9 @@ end
 -- front door.  Its press-Up zone sits where the back-room door's sits in its panel (panel x + 32 px) on the
 -- ground-floor line (y 544).  The shop props standing in front of that wall (shelves, jars, the plant: structures,
 -- code < 70000, and the shelf 70353) move out; the script zones (70105) stay.
-local function build_house()
-  local raw = read_map(HOUSE_MAP)
-  if not raw then return nil, "DATA " .. HOUSE_MAP .. " not found" end
-  local m = Map.parse(raw)
+-- (loader api 1.11: an EDIT of the house map through mod.game.maps — it composes with other mods' edits of the same
+-- map, and is served for the map module only)
+local function edit_house(m)
   local back, left = m:cell(0, 13, 17), m:cell(0, 13, 1)     -- the back-room door panel, the left plain panel
   assert(back[2] == 113035 and back[4] == 11 and left[2] == 113015, "house map: unexpected wall panels")
   m:set_cell(0, 13, 1, { back[1], back[2], back[3], back[4], left[5], 0, 0 })
@@ -156,7 +155,6 @@ local function build_house()
   -- x 96 inside this door's box.  The stock doors come before them in the list (lower actor slots); appended last,
   -- ours only fired on its left edge.
   table.insert(m.objs, 1, door)
-  return m:serialize()
 end
 
 -- ── the hall and the arena ────────────────────────────────────────────────────────────────────────────────────
@@ -686,14 +684,14 @@ end)
 
 -- ── install ────────────────────────────────────────────────────────────────────────────────────────────────────
 local function install()
-  if read_map(HALL_MAP) or read_map(ARENA_MAP) then return mod.log("testroom: DATA 4001/4002 already exist in the game — refusing") end
-  local house, e1 = build_house()
+  local MAPS = mod.game.maps
   local hall, e2 = build_hall()
   local ar, e3 = build_arena()
-  if not house or not hall or not ar then return mod.log("testroom: " .. tostring(e1 or e2 or e3)) end
-  mod.res.set("DATA", HOUSE_MAP, house)
-  mod.res.set("DATA", HALL_MAP, hall)
-  mod.res.set("DATA", ARENA_MAP, ar)
+  if not hall or not ar then return mod.log("testroom: " .. tostring(e2 or e3)) end
+  assert(MAPS.edit(HOUSE_MAP, edit_house, "testroom"))
+  assert(MAPS.define(HALL_MAP, hall, "testroom"))
+  assert(MAPS.define(ARENA_MAP, ar, "testroom"))
+  local house = MAPS.bytes(HOUSE_MAP)
   assert(mod.game.map.add_room { key = HALL, like = TEMPLATE, map = HALL_MAP })
   assert(mod.game.map.add_room { key = ARENA, like = TEMPLATE, map = ARENA_MAP, town = false })   -- hits do damage
   assert(mod.game.map.set_exit(HOUSE, DOOR_ZONE, HALL, 2))   -- house door → the hall's ground-floor door

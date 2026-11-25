@@ -1,0 +1,32 @@
+[mod]
+id          = "recettear"
+name        = "Recettear: Tonkiness Branch"
+version     = "0.1.0"
+description = "A Recettear crossover. Recette and Tear open a branch of their item shop in the storeroom behind Arche's family shop: buy stock wholesale from Tear, mind the counter and haggle with customers (Recettear's own pricing rules), level up as a merchant, pay off the branch's loan. Recette, Tear and their customers appear with their own sprites and portraits, converted once from your own copy of Recettear."
+authors     = ["Francesco149"]
+target_games = ["sotes_en"]
+
+[loader]
+api         = "1.11"
+min_version = "0.1.0"
+
+[setup]
+version = "1"
+summary = "Finds your Steam copy of Recettear: An Item Shop's Tale, reads its data files (bin\\data*.bin, lnkdatas.bin, bgm) and converts character sprites, portraits and two music tracks into this game's formats. The result (about 30 MB) is written to the mod_data\\recettear folder beside the game. Nothing in Recettear's folder or in this game's files is changed, and nothing is sent anywhere."
+
+[config.recettear_dir]
+type = "string"
+default = ""
+label = "Recettear folder (empty = find it through Steam)"
+
+[config.music]
+type = "bool"
+default = true
+label = "Play Recettear's shop music in the branch"
+
+[config.scale]
+type = "int"
+default = 75
+min = 40
+max = 100
+label = "Character sprite size, percent (applies at the next setup)"
