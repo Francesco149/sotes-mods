@@ -17,7 +17,7 @@ hashes; the launcher then verifies every downloaded file against the pinned `sha
 | `autoload` | Auto-Load Save | Launch straight into a save (config: `slot`). Orchestrates the loader's `mod.game.save` op. |
 | `ennse_voice` | Japanese Voice Patch (EN-SE) | English text + Japanese dialogue voices. You supply `sotesx_s.dll` from your own JP copy. |
 | `trainer` | Trainer | God mode / heal / gold / teleport to the cursor (F7) / warp to any room / give any item, every edition — over the loader's sandbox ops (api 1.2). Panels in the loader UI; `_G.trainer` for agents. Unreleased (0.1.0). |
-| `testroom` | Test Room | Proof of concept for custom content (loader api 1.7): a new door in Arche's house leads to a new room built from stock tiles, with an NPC whose talk script is Lua. Maps are built at load from your own game data and served through the loader's resource overlay (`mod.res`). Unreleased (0.1.0). |
+| `testroom` | Test Room | Proof of concept for custom content (loader api 1.9): a new door in Arche's house leads to the Mod Hall, a new room built from stock tiles where NPCs drive the game's own systems from Lua (shop, inn, books, warps, synthesized sounds), plus custom sprites — a recoloured NPC, Bit (a new character: own sprite sheet + animations) and the Glitch Cube (a new monster: own sheet + Lua behaviours). Maps are built at load from your own game data; the only shipped art is the mod's own (`bit.bmp`, `cube.bmp`, drawn by `art/make_art.py`). Unreleased (0.3.0). |
 
 ## Status
 

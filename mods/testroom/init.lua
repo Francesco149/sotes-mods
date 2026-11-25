@@ -1,4 +1,4 @@
--- testroom — proof of concept for custom content (loader api 1.8):
+-- testroom — proof of concept for custom content (loader api 1.9):
 --   * a NEW DOOR in Arche's house (210140, ground floor, left of the front door),
 --   * leading to the MOD HALL (210142) — a new room whose map is the back room's, widened to twice its length,
 --   * where six NPCs and a bookshelf demonstrate the game's own systems driven from Lua (mod.game.script):
@@ -10,6 +10,12 @@
 --       Arena master     monsters spawned on demand in a second custom room (210143, town rules off), a reward
 --                        cutscene when the wave is cleared
 --       bookshelf        the game's book reader on custom pages
+--       Bit              a NEW character: its own sprite sheet (bit.bmp, original art drawn by art/make_art.py), its
+--                        own animations (idle / wave / walk / dance clips), a patrol driven from Lua
+--   * custom sprites (mod.game.sprites): the Tester wears a recoloured copy of her stock sheet (built at load from the
+--     user's own data), Bit is drawn from the mod's own BMP, and the arena's Glitch Cubes are a NEW monster: the
+--     slime's body and AI under an original sheet (cube.bmp, same pose layout), with behaviours added in Lua —
+--     glitch-teleporting next to the leader, blinking faster when hurt, splitting in two when killed.
 --
 -- Nothing of the game ships with the mod: the maps are built at load from the user's own map data
 -- (mod.res.read) and served back to the game through the loader's resource overlay (mod.res.set).
@@ -34,7 +40,7 @@ local WIDEN = 10                               -- the hall: 10 more 2-column wal
 
 -- talk handles (≥ 1000: absolute, not remapped per room; no dramatist row → each code's default look)
 local H = { GUIDE = 990001, MERCHANT = 990002, INN = 990003, WARP = 990004, BARD = 990005, ARENA = 990006,
-            SHELF = 990010 }
+            BIT = 990007, SHELF = 990010 }
 local QUIZ_FLAG = 990001001                    -- story flag: the quiz prize was taken (saved with the game)
 
 -- ── little-endian helpers (LuaJIT = Lua 5.1: no string.pack) ──────────────────────────────────────────────────
@@ -174,6 +180,7 @@ local CAST = {   -- code, x, handle, facing (0 right, 1 left)
   { 50300, 576, H.WARP, 1 },       -- the green witch
   { 50212, 448, H.BARD, 1 },       -- a blonde girl
   { 50150, 320, H.ARENA, 0 },      -- a hunter
+  { 50240, 192, H.BIT, 0 },        -- Bit: a townswoman's body (a walker's box) wearing the mod's own sheet
 }
 local function build_hall()
   local m, err = template()
@@ -227,6 +234,16 @@ local function make_sounds()
   SFX.fanfare = melody({ { 523.3, 0.12 }, { 659.3, 0.12 }, { 784, 0.12 }, { 1046.5, 0.4 }, { 0, 0.05 },
                          { 784, 0.12 }, { 1046.5, 0.6 } })
   SFX.sad = melody({ { 392, 0.25 }, { 370, 0.25 }, { 349.2, 0.25 }, { 329.6, 0.7 } })
+  SFX.beep = melody({ { 880, 0.06 }, { 0, 0.03 }, { 1320, 0.08 }, { 0, 0.02 }, { 990, 0.06 } }, 0.25)
+  -- the Glitch Cube's blink: a downward burst of stepped noise
+  local g, seed, held = {}, 12345, 0
+  for i = 1, math.floor(0.28 * RATE) do
+    if i % 40 == 1 then seed = (seed * 1103515245 + 12345) % 2147483648; held = (seed / 2147483648) * 2 - 1 end
+    local t = i / RATE
+    local sq = (math.floor(t * (1400 - 3600 * t)) % 2 == 0) and 1 or -1
+    g[i] = 0.28 * math.exp(-6 * t) * (0.6 * held + 0.4 * sq)
+  end
+  SFX.glitch = SND.add(SND.wav(g, RATE))
 end
 
 -- ── the scripts ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -241,10 +258,14 @@ S.on_talk(H.GUIDE, function(s)
   while true do
     local c = s:choose({ "What is this place?", "Who are these people?", "Give me a quiz!", "Goodbye" })
     if c == 1 then
-      s:say("This room didn't exist until the mod loader built it from the house's own tiles.\nThe door you came through was added to your house the same way.")
-      s:say("Nothing here ships with the mod: the maps are made from your copy of the game at startup.")
+      s:say("This room didn't exist until the mod loader built it from the house's own tiles.")
+      s:say("The door you came through was added to your house the same way.")
+      s:say("None of the game's files ship with the mod: the maps are made from your copy of the game at startup.")
+      s:say("Like my dress? It's my usual one, recoloured by the mod.")
+      s:say("Bit over there is new. The mod drew every pixel of him!")
     elseif c == 2 then
       s:say("Everyone here shows off a different part of the game: the merchant's shop, the inn, the warp, the music, the arena.")
+      s:say("And Bit, by the bookshelf, is a brand-new character with his own sprite and animations.")
       s:say("Oh, and the bookshelf by the left wall. Try examining it.")
     elseif c == 3 then
       local right = 0
@@ -343,8 +364,9 @@ local WAVES = {
   { "Slimes (easy)", { 51010, 51011, 51010 }, 2 },
   { "Kobolds (normal)", { 51030, 51030, 51031 }, 5 },
   { "Orgs (hard)", { 51100, 51120, 51110 }, 12 },
+  { "Glitch Cubes (a new monster)", { 51010, 51010 }, 8, cube = true },
 }
-local arena = { wave = nil, slots = nil, cleared = 0 }
+local arena = { wave = nil, slots = nil, cleared = 0, cubes = {}, pending = {} }
 S.on_talk(H.ARENA, function(s)
   s:say("Looking for a fight? The arena is through here. Pick your opponents.")
   local items = {}
@@ -365,10 +387,220 @@ local function reward(w)
     s:narrate("Leave through the door to return to the hall.")
   end
 end
+-- ── custom sprites + the new characters (mod.game.sprites, api 1.9) ─────────────────────────────────────────────
+-- Banks are made once per session (they live in the engine's sprite system, across rooms); looks and clips are put
+-- on the characters every time their room loads (new actors each time).
+local SPR, ACT = mod.game.sprites, mod.game.actors
+local look = { banks = {}, room = nil }
+local function read_file(name)
+  local dir = mod.dir:match("[\\/]$") and mod.dir or mod.dir .. "\\"
+  local f, err = io.open(dir .. name, "rb")
+  if not f then mod.log("testroom: " .. tostring(err)) return nil end
+  local b = f:read("*a")
+  f:close()
+  return b
+end
+local function by_handle(h) for _, a in ipairs(ACT.list() or {}) do if a.handle == h then return a end end end
+local function by_slot(sl) for _, a in ipairs(ACT.list() or {}) do if a.slot == sl then return a end end end
+local function bank(key, make)
+  if look.banks[key] == nil then
+    local b, err = make()
+    look.banks[key] = b or false
+    if not b then mod.log("testroom: no " .. key .. " sprite: " .. tostring(err)) end
+  end
+  return look.banks[key] or nil
+end
+-- the Tester's dress, rose instead of blue: her own sheet (the user's data) with a palette edit
+local function guide_bank(src)
+  return bank("guide", function()
+    local img, err = SPR.sheet(src)
+    if not img then return nil, err end
+    for i = 1, 255 do
+      local r, g, b = img.pal[i][1], img.pal[i][2], img.pal[i][3]
+      if b > r + 20 and b >= g then img.pal[i] = { b, math.floor(g * 0.7), math.floor(r * 0.8) } end
+    end
+    return SPR.new_bank { like = src, image = img }
+  end)
+end
+-- a sheet the mod ships (original art): `like` = the stock bank whose cell grid / mirror offset it follows
+local function bmp_bank(key, file, like)
+  return bank(key, function()
+    local b = read_file(file)
+    if not b then return nil, file .. " missing" end
+    local img, err = SPR.bmp(b)
+    if not img then return nil, err end
+    return SPR.new_bank { like = like, image = img }
+  end)
+end
+local function body_of(p) return mod.mem.read_u32(p + 0x40) end
+local function place(p, x, y)                          -- body top-left, centi-px
+  local b = body_of(p)
+  mod.mem.write_i32(b + 4, x)
+  if y then mod.mem.write_i32(b + 8, y) end
+end
+local function face(p, dir) mod.mem.write_u32(body_of(p) + 0x2c, dir > 0 and 1 or 3) end
+
+-- Bit: bit.bmp = 8 x 4 cells of 80 x 96 like the townsfolk sheets (rows 2-3 mirrored: the bank's offset 16)
+local bit = { mode = "patrol" }
+local BITC
+local function bit_clips()
+  BITC = BITC or {
+    idle = SPR.clip { frames = { 0, 1, 2, 3 }, dur = 20 },
+    wave = SPR.clip { frames = { 4, 5, 6, 7, 6, 5 }, dur = 7 },
+    walk = SPR.clip { frames = { 8, 9, 10, 11, 12, 13, 14, 15 }, dur = 6 },
+    dance = SPR.clip { frames = { 4, 5, 6, 7, 6, 5, 8, 10, 12, 14, 0, 2 }, dur = 5 },
+  }
+  return BITC
+end
+local function bit_tick()
+  local p = bit.ptr
+  if not p then return end
+  if bit.mode == "dance" then                            -- spin: turn around every 12 frames
+    bit.spin = (bit.spin or 0) + 1
+    if bit.spin % 12 == 0 then face(p, (bit.spin / 12) % 2 == 0 and 1 or -1) end
+    return
+  end
+  if bit.mode ~= "patrol" or mod.game.map.event() then return end
+  local c = bit_clips()
+  if bit.wait > 0 then
+    bit.wait = bit.wait - 1
+    if bit.wait == 0 then SPR.set_clips(p, { stand = c.walk }); SPR.play(p, c.walk); face(p, bit.dir) end
+    return
+  end
+  local x = mod.mem.read_i32(body_of(p) + 4) + bit.dir * 60
+  place(p, x)
+  if (bit.dir > 0 and x >= bit.home + 7200) or (bit.dir < 0 and x <= bit.home - 6400) then
+    bit.dir = -bit.dir
+    bit.wait = 150 + math.random(0, 150)
+    SPR.set_clips(p, { stand = c.idle }); SPR.play(p, c.idle)
+  end
+end
+local function hall_tick()
+  local m = mod.game.map.get()
+  if not m or m.area ~= HALL then look.room, bit.ptr = nil, nil return end
+  local g = by_handle(H.GUIDE)
+  if g and look.room ~= g.ptr then                       -- the hall (re)loaded: new actors
+    look.room = g.ptr
+    local gb = guide_bank(mod.mem.read_u16(g.ptr + 0x48))
+    if gb then SPR.set_look(g, gb) end
+    local b = by_handle(H.BIT)
+    if b then
+      local bb = bmp_bank("bit", "bit.bmp", mod.mem.read_u16(b.ptr + 0x48))
+      if bb then
+        local c = bit_clips()
+        SPR.set_look(b, bb)
+        SPR.set_clips(b, { stand = c.idle, walk = c.walk, run = c.walk })
+        SPR.play(b, c.idle)
+        ACT.set_name(b, "Bit")
+        bit.ptr, bit.home, bit.dir, bit.wait, bit.mode = b.ptr, b.x, 1, 120, "patrol"
+      end
+    end
+  end
+  bit_tick()
+end
+
+S.on_talk(H.BIT, function(s)
+  local p, c = bit.ptr, bit_clips()
+  bit.mode = "talk"
+  if p then SPR.set_clips(p, { stand = c.wave }); SPR.play(p, c.wave) end
+  s:sound(SFX.beep)
+  s:say("Beep boop! Hello! I'm Bit.")
+  s:say("The game has never seen me before: the mod painted my pixels and taught me how to move.")
+  if p then SPR.set_clips(p, { stand = c.idle }) end
+  while true do
+    local k = s:choose({ "Show me a dance!", "How were you made?", "Bye, Bit!" })
+    if k == 1 then
+      s:say("Music, please!")
+      if p then SPR.set_clips(p, { stand = c.dance }); SPR.play(p, c.dance) end
+      bit.spin, bit.mode = 0, "dance"
+      s:sound(SFX.fanfare)
+      s:wait(2600)
+      bit.mode = "talk"
+      if p then SPR.set_clips(p, { stand = c.idle }); SPR.play(p, c.idle) end
+      s:say("Ta-da! Each of those moves is a clip the mod built: which cells to show, and for how long.")
+    elseif k == 2 then
+      s:say("My sprite sheet is a plain 8-bit BMP that ships with the mod: sixteen poses, then the same ones facing left.")
+      s:say("The loader turns it into one of the game's own sprite banks, and I borrow a townsperson's body to stand in.")
+      s:say("My walk is a little Lua script. Left, right, rest, repeat. Riveting stuff.")
+    else
+      break
+    end
+  end
+  s:sound(SFX.beep)
+  s:say("Bye! Beep!")
+  bit.mode, bit.wait = "patrol", 60
+  if p then SPR.set_clips(p, { stand = c.idle }); SPR.play(p, c.idle) end
+end, { name = "Bit" })
+
+-- The Glitch Cube: a slime underneath (its body, hops and attacks: retail's AI), wearing cube.bmp — the slime
+-- sheet's pose layout (4 x 12 cells of 80 x 80, mirror offset 24) in original art.  Lua adds the rest:
+--   * every few seconds it blinks: vanishes and reappears right behind the leader (sooner when hurt)
+--   * killed, a full-size cube splits into two smaller ones (gen 1: less HP, they don't split again)
+local CUBE_HP = { [0] = 60, [1] = 24 }
+local function cube_setup(sl, gen, i)
+  local a = by_slot(sl)
+  if not a then return end
+  local cb = bmp_bank("cube", "cube.bmp", mod.mem.read_u16(a.ptr + 0x48))
+  if cb then SPR.set_look(a, cb) end
+  ACT.set_name(a, gen == 0 and "Glitch Cube" or "Glitch Bit")
+  ACT.set_hp(a, CUBE_HP[gen], CUBE_HP[gen])
+  arena.cubes[sl] = { ptr = a.ptr, gen = gen, cd = 200 + 70 * (i or 0), last = a }
+end
+local function cube_blink(cu, a, leader)
+  local behind = leader.facing == 3 and 1 or -1         -- the side the leader has its back to
+  local x = leader.x + leader.w / 2 + behind * 5600 - a.w / 2
+  local y = leader.y + leader.h - a.h
+  place(a.ptr, math.floor(x), math.floor(y))
+  face(a.ptr, -behind)                                   -- facing the leader's back
+  SND.play(SFX.glitch)
+end
+local function cubes_tick()
+  if not next(arena.cubes) and #arena.pending == 0 then return end
+  local list = ACT.list() or {}
+  local alive, leader = {}, nil
+  for _, a in ipairs(list) do alive[a.slot] = a; if a.leader then leader = a end end
+  for sl, cu in pairs(arena.cubes) do
+    local a = alive[sl]
+    local hp = a and a.ptr == cu.ptr and ACT.hp(a)
+    if not a or a.ptr ~= cu.ptr or not hp or hp <= 0 then   -- dead (or gone): a full cube splits
+      arena.cubes[sl] = nil
+      if cu.gen == 0 then
+        local l = cu.last
+        arena.pending[#arena.pending + 1] = { at = 40, x = l.x + l.w / 2, y = l.y + l.h }
+      end
+    else
+      cu.last = a
+      cu.cd = cu.cd - 1
+      if cu.cd <= 0 and leader then
+        local hurt = hp * 2 < CUBE_HP[cu.gen]
+        local far = math.abs((a.x + a.w / 2) - (leader.x + leader.w / 2)) > 8000
+        if far or hurt then cube_blink(cu, a, leader) end
+        cu.cd = (hurt and 110 or 260) + math.random(0, 60)
+      end
+    end
+  end
+  for i = #arena.pending, 1, -1 do                       -- the split: two Glitch Bits where the cube fell
+    local pd = arena.pending[i]
+    pd.at = pd.at - 1
+    if pd.at <= 0 then
+      table.remove(arena.pending, i)
+      SND.play(SFX.glitch)
+      for k = 0, 1 do
+        local sl = ACT.spawn(51010, { x = math.floor(pd.x + (k == 0 and -2400 or 2400)), y = math.floor(pd.y), facing = k == 0 and 3 or 1 })
+        if sl then
+          cube_setup(sl, 1, k)
+          if arena.slots then arena.slots[#arena.slots + 1] = sl end
+        end
+      end
+    end
+  end
+end
+
 local function arena_tick()
   local m = mod.game.map.get()
   if not m or m.area ~= ARENA then
     if arena.slots then arena.slots = nil end           -- left mid-fight: the wave is gone with the room
+    arena.cubes, arena.pending = {}, {}
     return
   end
   if mod.game.map.event() then return end
@@ -376,10 +608,15 @@ local function arena_tick()
     arena.slots = {}
     for i, code in ipairs(arena.wave[2]) do
       local slot = mod.game.actors.spawn(code, { x = (120 + 90 * i) * 100, y = 54400, facing = 1 })
-      if slot then arena.slots[#arena.slots + 1] = slot end
+      if slot then
+        arena.slots[#arena.slots + 1] = slot
+        if arena.wave.cube then cube_setup(slot, 0, i) end
+      end
     end
     return
   end
+  cubes_tick()
+  if #arena.pending > 0 then return end
   if arena.slots and #arena.slots > 0 then
     local alive = {}
     for _, a in ipairs(mod.game.actors.list() or {}) do alive[a.slot] = a end
@@ -418,10 +655,11 @@ local function install()
   assert(mod.game.map.set_exit(ARENA, 2, HALL, 2))           -- arena doors → the hall
   assert(mod.game.map.set_exit(ARENA, 3, HALL, 2))
   make_sounds()
-  mod.on_frame(arena_tick)
+  mod.on_frame(function() hall_tick() arena_tick() end)
   mod.log(("testroom: house %d B, hall %d B (DATA %d), arena %d B (DATA %d)"):format(#house, #hall, HALL_MAP, #ar, ARENA_MAP))
 end
 
 _G.testroom = { Map = Map, read_map = read_map, talks = function(h) return talks[h or H.GUIDE] or 0 end, arena = arena,
-                ROOM = HALL, HALL = HALL, ARENA = ARENA, HOUSE = HOUSE, H = H, SFX = SFX, NPC_HANDLE = H.GUIDE }
+                ROOM = HALL, HALL = HALL, ARENA = ARENA, HOUSE = HOUSE, H = H, SFX = SFX, NPC_HANDLE = H.GUIDE,
+                look = look, bit = bit, dir = mod.dir }
 install()
