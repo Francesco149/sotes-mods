@@ -1,4 +1,4 @@
--- testroom — proof of concept for custom content (loader api 1.9):
+-- testroom — proof of concept for custom content (loader api 1.10):
 --   * a NEW DOOR in Arche's house (210140, ground floor, left of the front door),
 --   * leading to the MOD HALL (210142) — a new room whose map is the back room's, widened to twice its length,
 --   * where six NPCs and a bookshelf demonstrate the game's own systems driven from Lua (mod.game.script):
@@ -12,6 +12,8 @@
 --       bookshelf        the game's book reader on custom pages
 --       Bit              a NEW character: its own sprite sheet (bit.bmp, original art drawn by art/make_art.py), its
 --                        own animations (idle / wave / walk / dance clips), a patrol driven from Lua
+--   * new character types (mod.game.actors.define): Bit and the Glitch Cubes have codes of their own (50990, 51990,
+--     51991) — the map places Bit by his, the arena spawns cubes by theirs
 --   * custom sprites (mod.game.sprites): the Tester wears a recoloured copy of her stock sheet (built at load from the
 --     user's own data), Bit is drawn from the mod's own BMP, and the arena's Glitch Cubes are a NEW monster: the
 --     slime's body and AI under an original sheet (cube.bmp, same pose layout), with behaviours added in Lua —
@@ -173,15 +175,23 @@ end
 -- The hall: columns 3–4 (a plain panel on every floor, the floor beams, the ground strip) repeated WIDEN times —
 -- 40 columns, 1280 px.  The cast stands on the ground floor (feet y 544) between the left bookshelf and the door
 -- (now x 1088).  Each NPC = the house's townswoman record (50240) with another code / handle / place.
-local CAST = {   -- code, x, handle, facing (0 right, 1 left)
-  { 50240, 960, H.GUIDE, 1 },      -- Tester: Arche's mom's model
-  { 50160, 832, H.MERCHANT, 1 },   -- a moustached townsman
-  { 50290, 704, H.INN, 1 },        -- a maid
-  { 50300, 576, H.WARP, 1 },       -- the green witch
-  { 50212, 448, H.BARD, 1 },       -- a blonde girl
-  { 50150, 320, H.ARENA, 0 },      -- a hunter
-  { 50240, 192, H.BIT, 0 },        -- Bit: a townswoman's body (a walker's box) wearing the mod's own sheet
+-- A character record's x / y = the TOP-LEFT OF ITS SPRITE CELL: char_init hangs the body in the cell (x centred, the
+-- feet on the cell's bottom row), so feet = y + the sheet's cell height — and that height differs per character
+-- (townsfolk 96, the tall ones — guard, witch — 128, children 80).  Retail's maps follow it: in the opening town
+-- (DATA 1022) the guard's record is at y 384 and a townswoman's at 416 for the same street (feet 512); children
+-- sit at y % 32 == 16.  One y for everyone leaves the tall ones a tile deep in the floor (their bodies start inside
+-- it, so nothing pushes them out), while a short one just drops onto it.
+local FLOOR = 576                                -- the ground floor's walk line, px (the leader's feet)
+local CAST = {   -- code, x, handle, facing (0 right, 1 left), sprite cell height
+  { 50240, 960, H.GUIDE, 1, 96 },      -- Tester: Arche's mom's model
+  { 50160, 832, H.MERCHANT, 1, 96 },   -- a moustached townsman
+  { 50290, 704, H.INN, 1, 96 },        -- a maid
+  { 50300, 576, H.WARP, 1, 128 },      -- the green witch
+  { 50212, 448, H.BARD, 1, 80 },       -- a blonde girl
+  { 50150, 320, H.ARENA, 0, 128 },     -- a hunter
+  { 50990, 192, H.BIT, 0, 96 },        -- Bit: a NEW character code (actors.define below: a townswoman underneath)
 }
+local BIT_CODE, CUBE_CODE, CUBELET_CODE = 50990, 51990, 51991   -- new character types (unused codes in 50001..59999)
 local function build_hall()
   local m, err = template()
   if not m then return nil, err end
@@ -192,7 +202,7 @@ local function build_hall()
     local npc = clone(npc0)
     npc.rec[1] = m:next_id()
     npc.rec[5] = c[1]
-    npc.rec[2], npc.rec[3] = c[2], 480                -- ground floor (feet on y 544)
+    npc.rec[2], npc.rec[3] = c[2], FLOOR - c[5]       -- feet on the ground floor
     npc.A[2] = c[3]
     npc.A[5] = c[4]                                     -- facing: 0 = right, ≠ 0 = left
     npc.A[7] = 9                                        -- always present, never culled near the gate
@@ -235,6 +245,35 @@ local function make_sounds()
                          { 784, 0.12 }, { 1046.5, 0.6 } })
   SFX.sad = melody({ { 392, 0.25 }, { 370, 0.25 }, { 349.2, 0.25 }, { 329.6, 0.7 } })
   SFX.beep = melody({ { 880, 0.06 }, { 0, 0.03 }, { 1320, 0.08 }, { 0, 0.02 }, { 990, 0.06 } }, 0.25)
+  -- Bit's dance tune: 64 eighth notes of 0.2 s (12.8 s) — a square-ish lead over a bass on every beat
+  local N = { C4 = 261.6, D4 = 293.7, E4 = 329.6, F4 = 349.2, G4 = 392, A4 = 440, B4 = 493.9, C5 = 523.3, D5 = 587.3,
+              E5 = 659.3, F5 = 698.5, G5 = 784, A5 = 880, C6 = 1046.5 }
+  local lead = {
+    "C5", "E5", "G5", "E5", "C5", "E5", "G5", 0, "A5", "G5", "E5", "G5", "A5", "G5", "E5", 0,          -- sway
+    "F5", "A5", "C6", "A5", "F5", "A5", "C6", 0, "G5", "E5", "D5", "E5", "G5", "E5", "D5", 0,          -- moonwalk
+    "C5", 0, "C5", "E5", "G5", 0, "G5", "E5", "A5", 0, "A5", "G5", "E5", 0, "D5", "E5",                -- wave
+    "C5", "D5", "E5", "F5", "G5", "A5", "G5", "A5", "C6", "A5", "G5", "E5", "C6", "G5", "C6", "C6",    -- fast
+  }
+  local bass = { "C4", "C4", "A4", "A4", "F4", "F4", "G4", "G4", "C4", "C4", "A4", "E4", "C4", "E4", "G4", "C4" }
+  local d, step = {}, math.floor(0.2 * RATE)
+  for i, n in ipairs(lead) do
+    local f, fb = N[n], N[bass[math.floor((i - 1) / 4) + 1]] / 2
+    local o = (i - 1) * step
+    for k = 1, step do
+      local t = k / RATE
+      local v = 0.16 * math.exp(-5 * (((i - 1) % 2) * 0.2 + t)) * math.sin(2 * math.pi * fb * (((i - 1) % 2) * 0.2 + t))
+      if f then
+        local w = math.sin(2 * math.pi * f * t)
+        v = v + 0.2 * math.min(1, k / 150) * math.exp(-7 * t) * (w + 0.4 * (w > 0 and 1 or -1))
+      end
+      d[o + k] = v
+    end
+  end
+  for k = 1, math.floor(0.6 * RATE) do                   -- the last chord rings out
+    local t = k / RATE
+    d[#d + 1] = 0.2 * math.exp(-5 * t) * (math.sin(2 * math.pi * 523.3 * t) + math.sin(2 * math.pi * 659.3 * t) + math.sin(2 * math.pi * 784 * t)) / 2
+  end
+  SFX.dance = SND.add(SND.wav(d, RATE))
   -- the Glitch Cube's blink: a downward burst of stepped noise
   local g, seed, held = {}, 12345, 0
   for i = 1, math.floor(0.28 * RATE) do
@@ -364,9 +403,9 @@ local WAVES = {
   { "Slimes (easy)", { 51010, 51011, 51010 }, 2 },
   { "Kobolds (normal)", { 51030, 51030, 51031 }, 5 },
   { "Orgs (hard)", { 51100, 51120, 51110 }, 12 },
-  { "Glitch Cubes (a new monster)", { 51010, 51010 }, 8, cube = true },
+  { "Glitch Cubes (a new monster)", { CUBE_CODE, CUBE_CODE }, 8 },
 }
-local arena = { wave = nil, slots = nil, cleared = 0, cubes = {}, pending = {} }
+local arena = { wave = nil, slots = nil, cleared = 0, cubes = {}, pending = {}, typed = 0 }
 S.on_talk(H.ARENA, function(s)
   s:say("Looking for a fight? The arena is through here. Pick your opponents.")
   local items = {}
@@ -401,7 +440,6 @@ local function read_file(name)
   return b
 end
 local function by_handle(h) for _, a in ipairs(ACT.list() or {}) do if a.handle == h then return a end end end
-local function by_slot(sl) for _, a in ipairs(ACT.list() or {}) do if a.slot == sl then return a end end end
 local function bank(key, make)
   if look.banks[key] == nil then
     local b, err = make()
@@ -449,17 +487,42 @@ local function bit_clips()
     wave = SPR.clip { frames = { 4, 5, 6, 7, 6, 5 }, dur = 7 },
     walk = SPR.clip { frames = { 8, 9, 10, 11, 12, 13, 14, 15 }, dur = 6 },
     dance = SPR.clip { frames = { 4, 5, 6, 7, 6, 5, 8, 10, 12, 14, 0, 2 }, dur = 5 },
+    fast = SPR.clip { frames = { 4, 6, 8, 12, 5, 7, 10, 14 }, dur = 3 },
+    slide = SPR.clip { frames = { 8, 9, 10, 11, 12, 13, 14, 15 }, dur = 4 },
+    pose = SPR.clip { frames = { 6, 7 }, dur = 12 },
   }
   return BITC
+end
+-- The dance: DANCE_MS of choreography on the wall clock (the frame rate differs between machines), in step with
+-- the tune's 0.2 s eighth notes: sway + spin, a moonwalk each way (walking clip, sliding backwards), a fast spin, a
+-- pose.  Each part = a clip + where he stands (around the spot the dance began) + which way he faces.
+local DANCE_MS = 13200
+local function bit_dance(p)
+  local c = bit_clips()
+  local t = os.clock() - bit.t0
+  local beat = math.floor(t / 0.2)
+  local part, x, dir
+  if t < 3.2 then                                        -- sway, turning every two beats
+    part, x, dir = c.dance, 1600 * math.sin(t * math.pi / 0.8), (math.floor(beat / 4) % 2 == 0) and 1 or -1
+  elseif t < 6.4 then                                    -- moonwalk: out to the right facing left, back facing right
+    local u = (t - 3.2) / 1.6
+    part = c.slide
+    if u < 1 then x, dir = 4800 * u, -1 else x, dir = 4800 * (2 - u), 1 end
+  elseif t < 9.6 then                                    -- the wave, with a hop to the side on every beat
+    part, x, dir = c.wave, (beat % 2 == 0) and -1200 or 1200, (beat % 4 < 2) and 1 or -1
+  elseif t < 12.4 then                                   -- the fast part: spin on every beat
+    part, x, dir = c.fast, 800 * math.sin(t * math.pi / 0.4), (beat % 2 == 0) and 1 or -1
+  else                                                   -- ta-da
+    part, x, dir = c.pose, 0, bit.dir0
+  end
+  if bit.part ~= part then bit.part = part; SPR.set_clips(p, { stand = part }); SPR.play(p, part) end
+  place(p, math.floor(bit.x0 + x))
+  if bit.face ~= dir then bit.face = dir; face(p, dir) end
 end
 local function bit_tick()
   local p = bit.ptr
   if not p then return end
-  if bit.mode == "dance" then                            -- spin: turn around every 12 frames
-    bit.spin = (bit.spin or 0) + 1
-    if bit.spin % 12 == 0 then face(p, (bit.spin / 12) % 2 == 0 and 1 or -1) end
-    return
-  end
+  if bit.mode == "dance" then return bit_dance(p) end
   if bit.mode ~= "patrol" or mod.game.map.event() then return end
   local c = bit_clips()
   if bit.wait > 0 then
@@ -483,18 +546,8 @@ local function hall_tick()
     look.room = g.ptr
     local gb = guide_bank(mod.mem.read_u16(g.ptr + 0x48))
     if gb then SPR.set_look(g, gb) end
-    local b = by_handle(H.BIT)
-    if b then
-      local bb = bmp_bank("bit", "bit.bmp", mod.mem.read_u16(b.ptr + 0x48))
-      if bb then
-        local c = bit_clips()
-        SPR.set_look(b, bb)
-        SPR.set_clips(b, { stand = c.idle, walk = c.walk, run = c.walk })
-        SPR.play(b, c.idle)
-        ACT.set_name(b, "Bit")
-        bit.ptr, bit.home, bit.dir, bit.wait, bit.mode = b.ptr, b.x, 1, 120, "patrol"
-      end
-    end
+    local b = by_handle(H.BIT)                             -- his look / clips / name came with his type (BIT_CODE)
+    if b then bit.ptr, bit.home, bit.dir, bit.wait, bit.mode = b.ptr, b.x, 1, 120, "patrol" end
   end
   bit_tick()
 end
@@ -511,12 +564,18 @@ S.on_talk(H.BIT, function(s)
     local k = s:choose({ "Show me a dance!", "How were you made?", "Bye, Bit!" })
     if k == 1 then
       s:say("Music, please!")
-      if p then SPR.set_clips(p, { stand = c.dance }); SPR.play(p, c.dance) end
-      bit.spin, bit.mode = 0, "dance"
-      s:sound(SFX.fanfare)
-      s:wait(2600)
+      if p then
+        bit.x0, bit.dir0 = mod.mem.read_i32(body_of(p) + 4), mod.mem.read_u32(body_of(p) + 0x2c) == 1 and 1 or -1
+        bit.t0, bit.part, bit.face, bit.mode = os.clock(), nil, nil, "dance"
+      end
+      s:sound(SFX.dance)
+      s:wait(DANCE_MS)
       bit.mode = "talk"
-      if p then SPR.set_clips(p, { stand = c.idle }); SPR.play(p, c.idle) end
+      if p then
+        bit.took = os.clock() - bit.t0
+        place(p, bit.x0); face(p, bit.dir0)
+        SPR.set_clips(p, { stand = c.idle }); SPR.play(p, c.idle)
+      end
       s:say("Ta-da! Each of those moves is a clip the mod built: which cells to show, and for how long.")
     elseif k == 2 then
       s:say("My sprite sheet is a plain 8-bit BMP that ships with the mod: sixteen poses, then the same ones facing left.")
@@ -536,49 +595,39 @@ end, { name = "Bit" })
 -- sheet's pose layout (4 x 12 cells of 80 x 80, mirror offset 24) in original art.  Lua adds the rest:
 --   * every few seconds it blinks: vanishes and reappears right behind the leader (sooner when hurt)
 --   * killed, a full-size cube splits into two smaller ones (gen 1: less HP, they don't split again)
-local CUBE_HP = { [0] = 60, [1] = 24 }
-local function cube_setup(sl, gen, i)
-  local a = by_slot(sl)
-  if not a then return end
-  local cb = bmp_bank("cube", "cube.bmp", mod.mem.read_u16(a.ptr + 0x48))
-  if cb then SPR.set_look(a, cb) end
-  ACT.set_name(a, gen == 0 and "Glitch Cube" or "Glitch Bit")
-  ACT.set_hp(a, CUBE_HP[gen], CUBE_HP[gen])
-  arena.cubes[sl] = { ptr = a.ptr, gen = gen, cd = 200 + 70 * (i or 0), last = a }
+-- Both are character TYPES of their own (actors.define): the code picks the slime underneath, the type brings the
+-- sheet, the name, the HP and the Lua behaviours — spawned like any other code.
+local function cube_bank(p) return bmp_bank("cube", "cube.bmp", mod.mem.read_u16(p + 0x48)) end
+local function cube_tick(a)
+  local cu = arena.cubes[a.ptr]
+  if not cu then cu = { cd = 200 + math.random(0, 140) }; arena.cubes[a.ptr] = cu end
+  cu.cd = cu.cd - 1
+  if cu.cd > 0 then return end
+  local leader
+  for _, o in ipairs(ACT.list() or {}) do if o.leader then leader = o end end
+  local hp, max = ACT.hp(a)
+  local hurt = hp * 2 < max
+  if leader and (hurt or math.abs((a.x + a.w / 2) - (leader.x + leader.w / 2)) > 8000) then
+    local behind = leader.facing == 3 and 1 or -1         -- the side the leader has its back to
+    place(a.ptr, math.floor(leader.x + leader.w / 2 + behind * 5600 - a.w / 2), math.floor(leader.y + leader.h - a.h))
+    face(a.ptr, -behind)                                   -- facing the leader's back
+    SND.play(SFX.glitch)
+  end
+  cu.cd = (hurt and 110 or 260) + math.random(0, 60)
 end
-local function cube_blink(cu, a, leader)
-  local behind = leader.facing == 3 and 1 or -1         -- the side the leader has its back to
-  local x = leader.x + leader.w / 2 + behind * 5600 - a.w / 2
-  local y = leader.y + leader.h - a.h
-  place(a.ptr, math.floor(x), math.floor(y))
-  face(a.ptr, -behind)                                   -- facing the leader's back
-  SND.play(SFX.glitch)
+local function define_types()
+  assert(ACT.define { code = CUBE_CODE, base = 51010, name = "Glitch Cube", hp = 60, bank = cube_bank, on_tick = cube_tick,
+    on_death = function(a)                                 -- the split, 40 frames on, where it fell
+      arena.cubes[a.ptr], arena.typed = nil, arena.typed - 1
+      arena.pending[#arena.pending + 1] = { at = 40, x = a.x + a.w / 2, y = a.y + a.h }
+    end })
+  assert(ACT.define { code = CUBELET_CODE, base = 51010, name = "Glitch Bit", hp = 24, bank = cube_bank, on_tick = cube_tick,
+    on_death = function(a) arena.cubes[a.ptr], arena.typed = nil, arena.typed - 1 end })
+  assert(ACT.define { code = BIT_CODE, base = 50240, name = "Bit",
+    bank = function(p) return bmp_bank("bit", "bit.bmp", mod.mem.read_u16(p + 0x48)) end,
+    clips = { stand = bit_clips().idle, walk = bit_clips().walk, run = bit_clips().walk } })
 end
 local function cubes_tick()
-  if not next(arena.cubes) and #arena.pending == 0 then return end
-  local list = ACT.list() or {}
-  local alive, leader = {}, nil
-  for _, a in ipairs(list) do alive[a.slot] = a; if a.leader then leader = a end end
-  for sl, cu in pairs(arena.cubes) do
-    local a = alive[sl]
-    local hp = a and a.ptr == cu.ptr and ACT.hp(a)
-    if not a or a.ptr ~= cu.ptr or not hp or hp <= 0 then   -- dead (or gone): a full cube splits
-      arena.cubes[sl] = nil
-      if cu.gen == 0 then
-        local l = cu.last
-        arena.pending[#arena.pending + 1] = { at = 40, x = l.x + l.w / 2, y = l.y + l.h }
-      end
-    else
-      cu.last = a
-      cu.cd = cu.cd - 1
-      if cu.cd <= 0 and leader then
-        local hurt = hp * 2 < CUBE_HP[cu.gen]
-        local far = math.abs((a.x + a.w / 2) - (leader.x + leader.w / 2)) > 8000
-        if far or hurt then cube_blink(cu, a, leader) end
-        cu.cd = (hurt and 110 or 260) + math.random(0, 60)
-      end
-    end
-  end
   for i = #arena.pending, 1, -1 do                       -- the split: two Glitch Bits where the cube fell
     local pd = arena.pending[i]
     pd.at = pd.at - 1
@@ -586,11 +635,9 @@ local function cubes_tick()
       table.remove(arena.pending, i)
       SND.play(SFX.glitch)
       for k = 0, 1 do
-        local sl = ACT.spawn(51010, { x = math.floor(pd.x + (k == 0 and -2400 or 2400)), y = math.floor(pd.y), facing = k == 0 and 3 or 1 })
-        if sl then
-          cube_setup(sl, 1, k)
-          if arena.slots then arena.slots[#arena.slots + 1] = sl end
-        end
+        local sl = ACT.spawn(CUBELET_CODE, { x = math.floor(pd.x + (k == 0 and -2400 or 2400)), y = math.floor(pd.y), facing = k == 0 and 3 or 1 })
+        if sl then arena.typed = arena.typed + 1 end
+        if sl and arena.slots then arena.slots[#arena.slots + 1] = sl end
       end
     end
   end
@@ -600,7 +647,7 @@ local function arena_tick()
   local m = mod.game.map.get()
   if not m or m.area ~= ARENA then
     if arena.slots then arena.slots = nil end           -- left mid-fight: the wave is gone with the room
-    arena.cubes, arena.pending = {}, {}
+    arena.cubes, arena.pending, arena.typed = {}, {}, 0
     return
   end
   if mod.game.map.event() then return end
@@ -610,13 +657,14 @@ local function arena_tick()
       local slot = mod.game.actors.spawn(code, { x = (120 + 90 * i) * 100, y = 54400, facing = 1 })
       if slot then
         arena.slots[#arena.slots + 1] = slot
-        if arena.wave.cube then cube_setup(slot, 0, i) end
+        if ACT.defined(code) then arena.typed = arena.typed + 1 end
       end
     end
     return
   end
   cubes_tick()
-  if #arena.pending > 0 then return end
+  if #arena.pending > 0 or arena.typed > 0 then return end   -- a type's death (and its split) is reported on the
+                                                             -- game's tick, a beat after its slot empties
   if arena.slots and #arena.slots > 0 then
     local alive = {}
     for _, a in ipairs(mod.game.actors.list() or {}) do alive[a.slot] = a end
@@ -655,6 +703,7 @@ local function install()
   assert(mod.game.map.set_exit(ARENA, 2, HALL, 2))           -- arena doors → the hall
   assert(mod.game.map.set_exit(ARENA, 3, HALL, 2))
   make_sounds()
+  define_types()
   mod.on_frame(function() hall_tick() arena_tick() end)
   mod.log(("testroom: house %d B, hall %d B (DATA %d), arena %d B (DATA %d)"):format(#house, #hall, HALL_MAP, #ar, ARENA_MAP))
 end
