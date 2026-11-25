@@ -12,7 +12,8 @@ hashes; the launcher then verifies every downloaded file against the pinned `sha
 ## Showcase
 
 What the loader's content API can do today. Both mods below are Lua only, ship none of either game's
-files, and load side by side. Screenshots are from the English Special Edition running under Wine.
+files, and load side by side. Screenshots are from the English Special Edition on Windows (the setup
+prompt is from a Wine run).
 
 ### Recettear: Tonkiness Branch (`recettear`)
 
@@ -26,9 +27,11 @@ never blocks the story: customers only come back after you have been out visitin
 | ![Recette's menu](docs/img/recettear-menu.png) | ![A customer with his own portrait](docs/img/recettear-customer.png) |
 | Recette, Tear and the shelves in the new room; the game's own dialogue box and choice list | A Recettear customer at the counter, with his Recettear portrait |
 | ![Naming a price](docs/img/recettear-price.png) | ![Tear's wholesale list](docs/img/recettear-wholesale.png) |
-| Naming a price: under the customer's limit sells, a little over gets a counter-offer | Ordering stock from Tear (items and prices come from the game's own item table) |
-| ![Slimes in the cellar](docs/img/recettear-cellar.png) | ![The first-time setup prompt](docs/img/setup-consent.png) |
-| Recettear's slime as a real monster: it fights, takes damage and shows in the target window | The one-time setup asks first, with a security warning |
+| Naming a price: under the customer's limit sells, a little over gets a counter-offer | Tear, with her own portrait: wholesale orders by category, the loan, your merchant record |
+| ![Tear's stock list](docs/img/recettear-stock.png) | ![Slimes in the cellar](docs/img/recettear-cellar.png) |
+| The wholesale list (items and prices come from the game's own item table) | Recettear's slime and mushroom as real monsters: they fight, take damage and show in the target window |
+| ![The first-time setup prompt](docs/img/setup-consent.png) | |
+| The one-time setup asks first, with a security warning | |
 
 **You need your own copy of Recettear** (Steam). On first start the loader shows the prompt above; if
 you agree, the mod finds Recettear through Steam, converts the sprites, portraits and shop music it
@@ -49,7 +52,7 @@ How each piece gets into the game, and how much of it is the game's own code:
 
 Known limitations:
 
-- Tested on the English Special Edition only (Wine, plus one hand run on Windows). The old English
+- Tested on the English Special Edition only (Wine and Windows). The old English
   edition and the Japanese edition have not been run with this mod.
 - A save made inside the new rooms will not load if the mod is removed.
 - You sell stock bought from Tear, not items from your own bag (the loader has no item-removal call yet).
@@ -58,7 +61,7 @@ Known limitations:
   talk, but they are not party members and cannot fight alongside you.
 - The haggling follows Recettear's idea (a price limit per customer, near-pin bonus, counter-offers,
   combos) with its own numbers, not Recettear's exact formulas.
-- Under Wine the dialogue text can look unevenly spaced; that is the game's font handling there, not the mod.
+- Under Wine the dialogue text can look unevenly spaced; that is Wine's rendering of the game's font, not the mod.
 
 ### Test Room (`testroom`) — the proof of concept
 
@@ -67,8 +70,8 @@ each character shows off one system.
 
 | | |
 |---|---|
-| ![The Mod Hall](docs/img/testroom-hall.png) | ![Bit](docs/img/testroom-bit.png) |
-| The hall: a new room made from the house's own tiles, with a guide, a merchant, an innkeeper, a warp mage, a bard and an arena master | Bit, a new character drawn from the mod's own sprite sheet, with his own animations |
+| ![The Mod Hall](docs/img/testroom-hall.png) | ![Bit and the Arena Master](docs/img/testroom-bit.png) |
+| The hall: a new room made from the house's own tiles, with a guide, a merchant, an innkeeper, a warp mage, a bard and an arena master | The Arena Master talking; beside Arche stands Bit, a new character drawn from the mod's own sprite sheet |
 
 | piece | how it is injected | how native it is |
 |---|---|---|
