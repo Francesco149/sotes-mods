@@ -777,7 +777,9 @@ local function install()
   mod.on_frame(function()
     traffic_frame()
     local m = mod.game.map.get()
-    if m and m.area == SHOP and fget(F.INTRO) == 0 and not shop.intro_queued and not mod.game.map.event() then
+    if not m or m.area ~= SHOP then shop.intro_queued = false return end      -- asked again on the next visit (another save?)
+    if not shop.intro_queued and not mod.game.map.event() then
+      if fget(F.INTRO) ~= 0 then shop.intro_queued = true return end   -- seen in this save: no flag read per frame
       shop.intro_queued = true
       S.run(intro, { what = 'recettear intro' })
     end
