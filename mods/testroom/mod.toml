@@ -1,11 +1,11 @@
 [mod]
 id          = "testroom"
 name        = "Test Room"
-version     = "0.1.0"
-description = "Proof of concept: a new door in Arche's house (ground floor, right) leads to a custom room built from stock tiles, with a custom NPC. Exercises the loader's resource overlay (mod.res) and custom rooms (map.add_room / set_exit)."
+version     = "0.2.0"
+description = "Proof of concept: a new door in Arche's house leads to the Mod Hall — a custom room built from stock tiles where six NPCs and a bookshelf drive the game's own systems from Lua (choices, shop, inn, storage, books, warps, synthesized sounds) — and a custom arena with monsters on demand. Exercises mod.res, map.add_room / set_exit and mod.game.script / sound."
 authors     = ["Francesco149"]
 target_games = ["sotes_en"]
 
 [loader]
-api         = "1.7"
+api         = "1.8"
 min_version = "0.1.0"

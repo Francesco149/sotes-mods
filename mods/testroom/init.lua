@@ -1,7 +1,15 @@
--- testroom — proof of concept for custom content (loader api 1.7):
+-- testroom — proof of concept for custom content (loader api 1.8):
 --   * a NEW DOOR in Arche's house (210140, ground floor, left of the front door),
---   * leading to a CUSTOM ROOM (210142) — a new room record + a map built from stock tiles,
---   * with a custom NPC (talk script: see below).
+--   * leading to the MOD HALL (210142) — a new room whose map is the back room's, widened to twice its length,
+--   * where six NPCs and a bookshelf demonstrate the game's own systems driven from Lua (mod.game.script):
+--       Tester (guide)   branching dialogue, choice menus, a quiz remembered in the save (a story flag)
+--       Merchant         the game's shop on a custom stock
+--       Innkeeper        the game's own inn (its price window, payment, rest + heal); the storage box
+--       Warp mage        a destination menu → the warp
+--       Bard             stock sound effects and sounds synthesized in Lua (mod.game.sound)
+--       Arena master     monsters spawned on demand in a second custom room (210143, town rules off), a reward
+--                        cutscene when the wave is cleared
+--       bookshelf        the game's book reader on custom pages
 --
 -- Nothing of the game ships with the mod: the maps are built at load from the user's own map data
 -- (mod.res.read) and served back to the game through the loader's resource overlay (mod.res.set).
@@ -14,12 +22,20 @@
 -- Zone devices (doors): code 70102 = press-Up door, A[0] = zone id → the room record's exit for that zone.
 -- Characters (50000s): A[1] = talk handle (actor +0x1d8; < 1000 = local + 1000 × room), A[4] facing,
 --                      A[6] presence class (9 = always, never culled near the arrival gate).
+local S = mod.game.script
+local SND = mod.game.sound
 
 local HOUSE, HOUSE_MAP = 210140, 1025          -- Arche's house (DATA 1025, 34×20)
 local TEMPLATE, TEMPLATE_MAP = 210141, 1026    -- the back room (DATA 1026, 20×20): kind / tileset / BGM of a house room
-local ROOM, ROOM_MAP = 210142, 4001            -- ours: an unused room id + an unused DATA id
+local HALL, HALL_MAP = 210142, 4001            -- ours: unused room ids + unused DATA ids
+local ARENA, ARENA_MAP = 210143, 4002
 local DOOR_ZONE = 4                            -- the house's new zone (retail uses 1..3 there)
-local NPC_HANDLE = 990001                      -- ≥ 1000: absolute (not remapped per room); no dramatist row → default look
+local WIDEN = 10                               -- the hall: 10 more 2-column wall panels (20 → 40 columns)
+
+-- talk handles (≥ 1000: absolute, not remapped per room; no dramatist row → each code's default look)
+local H = { GUIDE = 990001, MERCHANT = 990002, INN = 990003, WARP = 990004, BARD = 990005, ARENA = 990006,
+            SHELF = 990010 }
+local QUIZ_FLAG = 990001001                    -- story flag: the quiz prize was taken (saved with the game)
 
 -- ── little-endian helpers (LuaJIT = Lua 5.1: no string.pack) ──────────────────────────────────────────────────
 local function u32(s, o) local a, b, c, d = s:byte(o + 1, o + 4); return a + b * 256 + c * 65536 + d * 16777216 end
@@ -58,7 +74,7 @@ end
 function Map:cell(z, y, x) return self.cells[(self.rows * z + y) * self.cols + x + 1] end
 function Map:set_cell(z, y, x, v) self.cells[(self.rows * z + y) * self.cols + x + 1] = v end
 function Map:serialize()
-  local out = { self.head:sub(1, 0x60), p32(#self.objs), self.head:sub(0x65, 0x68) }
+  local out = { self.head:sub(1, 0x54), p32(self.cols), self.head:sub(0x59, 0x60), p32(#self.objs), self.head:sub(0x65, 0x68) }
   for i = 1, #self.cells do out[#out + 1] = pack(self.cells[i]) end
   for _, o in ipairs(self.objs) do
     local r = o.rec
@@ -71,9 +87,30 @@ end
 function Map:find(pred) for _, o in ipairs(self.objs) do if pred(o) then return o end end end
 function Map:filter(pred) local k = {} for _, o in ipairs(self.objs) do if pred(o) then k[#k + 1] = o end end self.objs = k end
 function Map:next_id() local n = 0 for _, o in ipairs(self.objs) do if o.rec[1] > n then n = o.rec[1] end end return n + 1 end
+-- Insert `copies` copies of the columns [c0, c0 + w) right after them: every plane, every row.  Objects right of
+-- the insertion point move right by the inserted width.  (The wall panels repeat every 2 columns, so a 2-column
+-- slice of plain panels on every floor widens the room seamlessly.)
+function Map:widen(c0, w, copies)
+  local cols, add = self.cols, w * copies
+  local nc = {}
+  for z = 0, self.planes - 1 do
+    for y = 0, self.rows - 1 do
+      for x = 0, cols + add - 1 do
+        local sx
+        if x < c0 + w then sx = x
+        elseif x < c0 + w + add then sx = c0 + (x - c0 - w) % w
+        else sx = x - add end
+        nc[(self.rows * z + y) * (cols + add) + x + 1] = { unpack(self:cell(z, y, sx)) }
+      end
+    end
+  end
+  self.cells, self.cols = nc, cols + add
+  for _, o in ipairs(self.objs) do
+    if o.rec[2] >= (c0 + w) * 32 then o.rec[2] = o.rec[2] + add * 32 end
+  end
+end
 local function clone(o)
-  local c = { rec = {unpack(o.rec)}, A = {unpack(o.A)}, B = {unpack(o.B)}, C = o.C, D = o.D }
-  return c
+  return { rec = {unpack(o.rec)}, A = {unpack(o.A)}, B = {unpack(o.B)}, C = o.C, D = o.D }
 end
 
 local function read_map(id)
@@ -114,123 +151,277 @@ local function build_house()
   return m:serialize()
 end
 
--- ── the test room ─────────────────────────────────────────────────────────────────────────────────────────────
--- The back room's map, minus its containers / switches (their handles drive 210141's own scripts): its walls,
--- props and both doors (zone 2 ground floor, 3 middle floor) stay; both doors lead back to the house's new door.
--- Plus one NPC on the ground floor: a townswoman model (code 50240 = Arche's mom's model; our handle has no
--- dramatist row, so the code's default look is used).
-local function build_room()
+-- ── the hall and the arena ────────────────────────────────────────────────────────────────────────────────────
+-- Both start from the back room's map minus its containers' / switches' handles (they drive 210141's own scripts):
+-- walls, props and both doors (zone 2 ground floor, 3 middle floor) stay.
+local function template()
   local raw = read_map(TEMPLATE_MAP)
   if not raw then return nil, "DATA " .. TEMPLATE_MAP .. " not found" end
-  local house = Map.parse(read_map(HOUSE_MAP))
   local m = Map.parse(raw)
   for _, o in ipairs(m.objs) do                         -- furniture stays, inert: no talk / search handle
     if o.rec[5] >= 70000 and o.rec[5] ~= 70102 and #o.A >= 2 then o.A[2] = 0 end
   end
-  local npc = clone(house:find(function(o) return o.rec[5] == 50240 end))
-  npc.rec[1] = m:next_id()
-  npc.rec[2], npc.rec[3] = 224, 480                    -- ground floor (feet on y 544), left of the door
-  npc.A[2] = NPC_HANDLE
-  npc.A[5] = 0                                         -- facing: 0 = right (≠ 0 = left)
-  npc.A[7] = 9                                         -- always present, never culled near the gate
-  m.objs[#m.objs + 1] = npc
+  return m
+end
+
+-- The hall: columns 3–4 (a plain panel on every floor, the floor beams, the ground strip) repeated WIDEN times —
+-- 40 columns, 1280 px.  The cast stands on the ground floor (feet y 544) between the left bookshelf and the door
+-- (now x 1088).  Each NPC = the house's townswoman record (50240) with another code / handle / place.
+local CAST = {   -- code, x, handle, facing (0 right, 1 left)
+  { 50240, 960, H.GUIDE, 1 },      -- Tester: Arche's mom's model
+  { 50160, 832, H.MERCHANT, 1 },   -- a moustached townsman
+  { 50290, 704, H.INN, 1 },        -- a maid
+  { 50300, 576, H.WARP, 1 },       -- the green witch
+  { 50212, 448, H.BARD, 1 },       -- a blonde girl
+  { 50150, 320, H.ARENA, 0 },      -- a hunter
+}
+local function build_hall()
+  local m, err = template()
+  if not m then return nil, err end
+  local house = Map.parse(read_map(HOUSE_MAP))
+  local npc0 = house:find(function(o) return o.rec[5] == 50240 end)
+  m:widen(3, 2, WIDEN)
+  for _, c in ipairs(CAST) do
+    local npc = clone(npc0)
+    npc.rec[1] = m:next_id()
+    npc.rec[5] = c[1]
+    npc.rec[2], npc.rec[3] = c[2], 480                -- ground floor (feet on y 544)
+    npc.A[2] = c[3]
+    npc.A[5] = c[4]                                     -- facing: 0 = right, ≠ 0 = left
+    npc.A[7] = 9                                        -- always present, never culled near the gate
+    m.objs[#m.objs + 1] = npc
+  end
+  -- the ground-floor bookshelf (70353 at x 32, y 448) gets a handle: examining it runs our book
+  local shelf = m:find(function(o) return o.rec[5] == 70353 and o.rec[3] == 448 end)
+  if shelf then shelf.A[2] = H.SHELF end
+  return m:serialize()
+end
+local function build_arena()
+  local m, err = template()
+  if not m then return nil, err end
+  -- the ground floor cleared for the fight: the props standing on it go (the floors, walls and doors stay)
+  m:filter(function(o) local r = o.rec return not (r[5] < 70000 and r[3] >= 400) end)
   return m:serialize()
 end
 
--- ── the NPC's talk script ──────────────────────────────────────────────────────────────────────────────────────
--- Talking (attack / V next to an NPC) runs touch_pass → event_run(mode 2) → script_engine (0x40c380 / SE 0x40a0c0),
--- a hard-coded chain of per-chapter script functions that each test the room record, the event mode (+0x14) and
--- the talked-to actor's handle (ev +0x4 → actor +0x1d8).  Ours = a typed pre-hook on script_engine that claims
--- (room, mode 2, NPC_HANDLE) and runs the beat retail's own talk scripts run (chs_49f7c0, the Arche's house
--- talks): script_begin → camera on the leader → party cast → stance → face each other → messages → script_end,
--- through the retail primitives (thiscall on the event runner; script_wait runs the frames, 6 = skipped / quit).
-local ffi = require("ffi")
-local P = {}
-local function prim(name, sig)
-  local va = mod.sym.va(name)
-  if not va then error("testroom: symbol " .. name .. " unavailable on " .. tostring(mod.edition)) end
-  P[name] = ffi.cast(sig, va)
+-- ── sounds (synthesized here: nothing shipped) ────────────────────────────────────────────────────────────────
+local RATE = 22050
+local function tone(out, freq, dur, vol)
+  local n = math.floor(dur * RATE)
+  for i = 1, n do
+    local t = i / RATE
+    local env = math.min(1, i / 200) * math.exp(-4 * t / dur)
+    out[#out + 1] = vol * env * (math.sin(2 * math.pi * freq * t) + 0.3 * math.sin(4 * math.pi * freq * t))
+  end
 end
-local function bind_prims()
-  prim("script_begin", "void (__thiscall *)(void *)")
-  prim("script_end", "void (__thiscall *)(void *)")
-  prim("script_leader", "void *(__thiscall *)(void *)")
-  prim("script_party_cast", "void (__thiscall *)(void *)")
-  prim("script_wait", "int (__thiscall *)(void *)")
-  prim("scene_party_stance", "int (__thiscall *)(void *, int, void *)")
-  prim("scene_talk_face", "int (__thiscall *)(void *, int, void *, int, int)")
-  prim("scene_msg", "void (__thiscall *)(void *, uint32_t, void *, const char *, int, int, int, const char *, int, int, uint32_t)")
+local function melody(notes, vol)
+  local s = {}
+  for _, n in ipairs(notes) do
+    if n[1] == 0 then for _ = 1, math.floor(n[2] * RATE) do s[#s + 1] = 0 end else tone(s, n[1], n[2], vol or 0.35) end
+  end
+  return SND.add(SND.wav(s, RATE))
+end
+local SFX = {}
+local function make_sounds()
+  SFX.chime = melody({ { 1318.5, 0.12 }, { 1568, 0.12 }, { 2093, 0.35 } })                         -- E6 G6 C7
+  SFX.fanfare = melody({ { 523.3, 0.12 }, { 659.3, 0.12 }, { 784, 0.12 }, { 1046.5, 0.4 }, { 0, 0.05 },
+                         { 784, 0.12 }, { 1046.5, 0.6 } })
+  SFX.sad = melody({ { 392, 0.25 }, { 370, 0.25 }, { 349.2, 0.25 }, { 329.6, 0.7 } })
 end
 
-local NPC_NAME = "Tester"
-local LINES = {
-  "Oh! A visitor! You found the door that wasn't there yesterday.",
-  "This room is a test: a map the mod loader built from the game's own tiles, behind a door it added to your house.",
-  "And I'm a test too. My words come from a Lua script, through the game's own message window.",
+-- ── the scripts ────────────────────────────────────────────────────────────────────────────────────────────────
+local talks = {}
+local function count(h) talks[h] = (talks[h] or 0) + 1 return talks[h] end
+
+S.on_talk(H.GUIDE, function(s)
+  if count(H.GUIDE) == 1 then
+    s:say("Oh! A visitor! You found the door that wasn't there yesterday.")
+    s:say("Welcome to the Mod Hall. Everything in here is the game's own machinery, driven by a Lua mod.")
+  end
+  while true do
+    local c = s:choose({ "What is this place?", "Who are these people?", "Give me a quiz!", "Goodbye" })
+    if c == 1 then
+      s:say("This room didn't exist until the mod loader built it from the house's own tiles.\nThe door you came through was added to your house the same way.")
+      s:say("Nothing here ships with the mod: the maps are made from your copy of the game at startup.")
+    elseif c == 2 then
+      s:say("Everyone here shows off a different part of the game: the merchant's shop, the inn, the warp, the music, the arena.")
+      s:say("Oh, and the bookshelf by the left wall. Try examining it.")
+    elseif c == 3 then
+      local right = 0
+      local q = {
+        { "How many columns wide is this hall?", { "20", "40", "64" }, 2 },
+        { "What does a mod script talk to the game through?", { "Magic", "The game's own functions", "Carrier pigeons" }, 2 },
+        { "Which of these is a slime?", { "Green Slime", "Org Sworder", "Kobold" }, 1 },
+      }
+      for i, qq in ipairs(q) do
+        s:narrate(("Question %d: %s"):format(i, qq[1]))
+        local a = s:choose(qq[2], { no_cancel = true })
+        if a == qq[3] then right = right + 1; s:sound(SFX.chime) else s:sound(SFX.sad) end
+      end
+      if right == #q then
+        s:sound(SFX.fanfare)
+        if mod.game.flags.story.get(QUIZ_FLAG) then
+          s:say("All right again! The prize was already yours, though.")
+        else
+          s:say("All correct! Here, a prize.")
+          s:give(3, 5)                                  -- 5 gold coins (500 CP), retail's "obtained" message
+          mod.game.flags.story.set(QUIZ_FLAG, 1)        -- saved with the game
+        end
+      else
+        s:say(("%d out of %d. Try again any time!"):format(right, #q))
+      end
+    else
+      break
+    end
+  end
+  s:say("Enjoy the hall!")
+end, { name = "Tester" })
+
+S.on_talk(H.MERCHANT, function(s)
+  s:say("Rare goods from all over the kingdom! Have a look.")
+  s:shop({ 110161, 110092, 110150, 120091, 150050, 164050, 201040, 201012, 202010 })
+  s:say("Come again!")
+end, { name = "Merchant" })
+
+local INN_PRICE = 2000                                  -- CP (20 silver)
+S.on_talk(H.INN, function(s)
+  local c = s:choose({ "A room for the night", "Storage box", "Nothing" })
+  if c == 1 then
+    s:inn {                                             -- the game's own inn: its price window, payment, rest, heal
+      price = INN_PRICE,
+      offer = "A room for the night is %d copper. Will you stay?",
+      decline = "Maybe another time, then.",
+      broke = "Oh dear, you don't have enough money.",
+      morning = "Good morning! Did you sleep well?",
+      bye = "Come back any time!",
+    }
+  elseif c == 2 then
+    s:storage()
+  else
+    s:say("Take care!")
+  end
+end, { name = "Innkeeper" })
+
+local DESTS = {
+  { "Arche's house", HOUSE, DOOR_ZONE },
+  { "Barness Hills", 280110, 0 },
+  { "Flower field north of Chartreux", 420125, 0 },
 }
-local talks = 0
+S.on_talk(H.WARP, function(s)
+  s:say("I can send you anywhere I've been. Careful: travelling ahead of the story can confuse it.")
+  local items = {}
+  for i, d in ipairs(DESTS) do items[i] = d[1] end
+  items[#items + 1] = "Stay here"
+  local c = s:choose(items)
+  local d = c and DESTS[c]
+  if not d then s:say("Another time.") return end
+  s:say(("To %s, then. Hold still!"):format(d[1]))
+  s:sound(SFX.chime)
+  S.after(function() mod.game.map.warp(d[2], d[3], true) end)   -- after the event: a warp armed during one is lost
+end, { name = "Warp Mage" })
 
-local function u32p(p, off) return ffi.cast("uint32_t *", ffi.cast("uint8_t *", p) + off) end
-local function camera_on_leader(ev)                    -- ev +0x4c..+0x5c: pan to the leader; +0x20 = 3 (camera)
-  local lead = P.script_leader(ev)
-  u32p(ev, 0x4c)[0] = 0; u32p(ev, 0x5c)[0] = ffi.cast("uint32_t", lead)
-  u32p(ev, 0x50)[0] = 0; u32p(ev, 0x54)[0] = 0; u32p(ev, 0x58)[0] = 800
-  u32p(ev, 0x20)[0] = 3
+S.on_talk(H.BARD, function(s)
+  s:say("Want to hear something? Some of these the game already knows; the others I made up just now.")
+  local list = {
+    { "Chime (made in Lua)", SFX.chime }, { "Fanfare (made in Lua)", SFX.fanfare }, { "Sad trombone (made in Lua)", SFX.sad },
+    { "Stock sound 5", 5 }, { "Stock sound 12", 12 }, { "Stock sound 40", 40 }, { "Stock sound 100", 100 },
+  }
+  while true do
+    local items = {}
+    for i, l in ipairs(list) do items[i] = l[1] end
+    items[#items + 1] = "That's enough"
+    local c = s:choose(items)
+    if not c or not list[c] then break end
+    s:sound(list[c][2])
+    s:wait(600)
+  end
+  s:say("Thanks for listening!")
+end, { name = "Bard" })
+
+-- the arena: a wave chosen here, spawned when the party arrives in 210143, a reward cutscene when it is cleared
+local WAVES = {
+  { "Slimes (easy)", { 51010, 51011, 51010 }, 2 },
+  { "Kobolds (normal)", { 51030, 51030, 51031 }, 5 },
+  { "Orgs (hard)", { 51100, 51120, 51110 }, 12 },
+}
+local arena = { wave = nil, slots = nil, cleared = 0 }
+S.on_talk(H.ARENA, function(s)
+  s:say("Looking for a fight? The arena is through here. Pick your opponents.")
+  local items = {}
+  for i, w in ipairs(WAVES) do items[i] = w[1] end
+  items[#items + 1] = "Not now"
+  local c = s:choose(items)
+  if not c or not WAVES[c] then s:say("Come back when you're ready.") return end
+  s:say("Good luck! Leave through the door when you're done.")
+  arena.wave, arena.slots = WAVES[c], nil
+  S.after(function() mod.game.map.warp(ARENA, 2, true) end)
+end, { name = "Arena Master" })
+
+local function reward(w)
+  return function(s)
+    s:sound(SFX.fanfare)
+    s:narrate(("The %s are beaten!"):format(w[1]:match("^(%S+)"):lower()))
+    s:give(3, w[3])                                     -- w[3] gold coins
+    s:narrate("Leave through the door to return to the hall.")
+  end
+end
+local function arena_tick()
+  local m = mod.game.map.get()
+  if not m or m.area ~= ARENA then
+    if arena.slots then arena.slots = nil end           -- left mid-fight: the wave is gone with the room
+    return
+  end
+  if mod.game.map.event() then return end
+  if arena.wave and not arena.slots then                -- just arrived: the wave comes in from the left
+    arena.slots = {}
+    for i, code in ipairs(arena.wave[2]) do
+      local slot = mod.game.actors.spawn(code, { x = (120 + 90 * i) * 100, y = 54400, facing = 1 })
+      if slot then arena.slots[#arena.slots + 1] = slot end
+    end
+    return
+  end
+  if arena.slots and #arena.slots > 0 then
+    local alive = {}
+    for _, a in ipairs(mod.game.actors.list() or {}) do alive[a.slot] = a end
+    for _, sl in ipairs(arena.slots) do if alive[sl] then return end end
+    local w = arena.wave
+    arena.wave, arena.slots = nil, nil
+    arena.cleared = arena.cleared + 1
+    S.run(reward(w), { what = "arena reward" })
+  end
 end
 
-local function talk(ev)
-  local actor = ffi.cast("void *", u32p(ev, 0x4)[0])
-  P.script_begin(ev)
-  camera_on_leader(ev)
-  P.script_party_cast(ev)
-  if P.script_wait(ev) == 6 then return 6 end
-  if P.scene_party_stance(ev, 0, ffi.cast("void *", u32p(ev, 0x8)[0])) ~= 0 then
-    if P.script_wait(ev) == 6 then return 6 end
-  end
-  P.scene_talk_face(ev, 0, actor, 1, 1)
-  if P.script_wait(ev) == 6 then return 6 end
-  camera_on_leader(ev)
-  if P.script_wait(ev) == 6 then return 6 end
-  talks = talks + 1
-  local lines = talks == 1 and LINES or { ("You've talked to me %d times now. Still here, still a test."):format(talks) }
-  for _, text in ipairs(lines) do
-    P.scene_msg(ev, 0, actor, text, 0, 1, 0, NPC_NAME, 0, 0, 0)
-    if P.script_wait(ev) == 6 then return 6 end
-  end
-  P.script_end(ev)
-  return 0
-end
-
-local function install_talk()
-  bind_prims()
-  mod.hook.typed(mod.sym.va("script_engine"), "int __thiscall(void *)", {
-    pre = function(ctx)
-      local ev = ctx.args[1]
-      if u32p(ev, 0x14)[0] ~= 2 then return end                      -- mode 2 = talk / examine
-      local m = mod.game.map.get()
-      if not m or m.area ~= ROOM then return end
-      local actor = u32p(ev, 0x4)[0]
-      if actor == 0 or ffi.cast("int32_t *", ffi.cast("uint8_t *", actor) + 0x1d8)[0] ~= NPC_HANDLE then return end
-      ctx.blocked = true
-      ctx.ret = talk(ev)
-    end,
+S.on_talk(H.SHELF, function(s)
+  s:book("The Modder's Handbook", {
+    "Chapter 1: Doors\n\nA door is an invisible zone device in front of a door-shaped wall panel. Press Up in it, and the room's exit table says where you go.",
+    "Chapter 2: Rooms\n\nA room is a record in the area table plus a map resource. The loader adds both; the game loads them like its own.",
+    "Chapter 3: People\n\nEveryone you can talk to carries a handle. When you talk to them, the game asks every script whether that handle is theirs. Ours answer in Lua.",
+    "Chapter 4: Everything else\n\nShops, inns, books, choices, gifts: the game already knows how to do all of these. A mod only has to ask.",
   })
-end
+end)
 
+-- ── install ────────────────────────────────────────────────────────────────────────────────────────────────────
 local function install()
-  if read_map(ROOM_MAP) then return mod.log("testroom: DATA " .. ROOM_MAP .. " already exists in the game — refusing") end
+  if read_map(HALL_MAP) or read_map(ARENA_MAP) then return mod.log("testroom: DATA 4001/4002 already exist in the game — refusing") end
   local house, e1 = build_house()
-  local room, e2 = build_room()
-  if not house or not room then return mod.log("testroom: " .. tostring(e1 or e2)) end
+  local hall, e2 = build_hall()
+  local ar, e3 = build_arena()
+  if not house or not hall or not ar then return mod.log("testroom: " .. tostring(e1 or e2 or e3)) end
   mod.res.set("DATA", HOUSE_MAP, house)
-  mod.res.set("DATA", ROOM_MAP, room)
-  assert(mod.game.map.add_room { key = ROOM, like = TEMPLATE, map = ROOM_MAP })
-  assert(mod.game.map.set_exit(HOUSE, DOOR_ZONE, ROOM, 2))   -- house door → arrive at the room's ground-floor door
-  assert(mod.game.map.set_exit(ROOM, 2, HOUSE, DOOR_ZONE))   -- room doors → back through the new house door
-  assert(mod.game.map.set_exit(ROOM, 3, HOUSE, DOOR_ZONE))
-  install_talk()
-  mod.log(("testroom: house %d B, room %d B (DATA %d), room %d ⇄ %d zone %d"):format(#house, #room, ROOM_MAP, ROOM, HOUSE, DOOR_ZONE))
+  mod.res.set("DATA", HALL_MAP, hall)
+  mod.res.set("DATA", ARENA_MAP, ar)
+  assert(mod.game.map.add_room { key = HALL, like = TEMPLATE, map = HALL_MAP })
+  assert(mod.game.map.add_room { key = ARENA, like = TEMPLATE, map = ARENA_MAP, town = false })   -- hits do damage
+  assert(mod.game.map.set_exit(HOUSE, DOOR_ZONE, HALL, 2))   -- house door → the hall's ground-floor door
+  assert(mod.game.map.set_exit(HALL, 2, HOUSE, DOOR_ZONE))   -- hall doors → back through the new house door
+  assert(mod.game.map.set_exit(HALL, 3, HOUSE, DOOR_ZONE))
+  assert(mod.game.map.set_exit(ARENA, 2, HALL, 2))           -- arena doors → the hall
+  assert(mod.game.map.set_exit(ARENA, 3, HALL, 2))
+  make_sounds()
+  mod.on_frame(arena_tick)
+  mod.log(("testroom: house %d B, hall %d B (DATA %d), arena %d B (DATA %d)"):format(#house, #hall, HALL_MAP, #ar, ARENA_MAP))
 end
 
-_G.testroom = { Map = Map, read_map = read_map, talks = function() return talks end, ROOM = ROOM, HOUSE = HOUSE, NPC_HANDLE = NPC_HANDLE }
+_G.testroom = { Map = Map, read_map = read_map, talks = function(h) return talks[h or H.GUIDE] or 0 end, arena = arena,
+                ROOM = HALL, HALL = HALL, ARENA = ARENA, HOUSE = HOUSE, H = H, SFX = SFX, NPC_HANDLE = H.GUIDE }
 install()
