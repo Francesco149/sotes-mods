@@ -1,0 +1,11 @@
+[mod]
+id          = "testroom"
+name        = "Test Room"
+version     = "0.1.0"
+description = "Proof of concept: a new door in Arche's house (ground floor, right) leads to a custom room built from stock tiles, with a custom NPC. Exercises the loader's resource overlay (mod.res) and custom rooms (map.add_room / set_exit)."
+authors     = ["Francesco149"]
+target_games = ["sotes_en"]
+
+[loader]
+api         = "1.7"
+min_version = "0.1.0"
