@@ -785,7 +785,7 @@ local function install()
     end
   end)
   if mod.config.get('music') ~= false and A.music and A.music.shop then
-    SND.room_music(SHOP, mod.data_dir .. 'bgm_shop.wav', { volume = -700 })
+    SND.room_music(SHOP, mod.data_dir .. 'bgm_shop.wav')   -- at the game's music volume, levelled to its tracks
   end
   mod.log(('installed: storeroom door (zone %d) -> the branch (room %d), cellar %d; %d goods'):format(DOOR_ZONE, SHOP, CELLAR, #goods()))
 end
