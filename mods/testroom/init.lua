@@ -106,7 +106,11 @@ local function build_house()
   door.rec[1] = m:next_id()
   door.rec[2] = 1 * 32 + 32                            -- 64
   door.A[1] = DOOR_ZONE
-  m.objs[#m.objs + 1] = door
+  -- FIRST in the object list: zone_pass takes the first live zone actor overlapping the leader and stops there even
+  -- when that zone has no exit — the house's script zones (70105, ids 901–905) run along the ground floor, 905 at
+  -- x 96 inside this door's box.  The stock doors come before them in the list (lower actor slots); appended last,
+  -- ours only fired on its left edge.
+  table.insert(m.objs, 1, door)
   return m:serialize()
 end
 
