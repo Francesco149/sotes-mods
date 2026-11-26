@@ -1,8 +1,8 @@
 [mod]
 id          = "recettear"
 name        = "Recettear: Tonkiness Branch"
-version     = "0.3.0"
-description = "A Recettear crossover. Recette and Tear open a branch of their item shop in the storeroom behind Arche's family shop: buy stock wholesale from Tear, mind the counter and haggle with customers (Recettear's own pricing rules), level up as a merchant, pay off the branch's loan. Tear hands over a starter kit of Recettear's own items (added to the game as new items, with their own icons), and the cellar's monsters drop them. Recette can also send you into the Hall of Trials, Recettear's first dungeon rebuilt as a side-scrolling cave of this game: a new layout every visit, five floors joined by magic circles, Recettear's own monsters and treasure, and its rule that whatever you find is lost (all but one item) if you fall. Bring your finds back and sell them in the shop. Recette, Tear and their customers appear with their own sprites and portraits, converted once from your own copy of Recettear."
+version     = "0.4.0"
+description = "A Recettear crossover. Recette and Tear open a branch of their item shop in the storeroom behind Arche's family shop: buy stock wholesale from Tear, mind the counter and haggle with customers (Recettear's own pricing rules), level up as a merchant, pay off the branch's loan. Tear hands over a starter kit of Recettear's own items (added to the game as new items, with their own icons), and the cellar's monsters drop them. Recette can also send you into the Hall of Trials, Recettear's first dungeon rebuilt as side-scrolling floors of this game: a new maze of chambers every visit (brick halls above, caves below, shafts to climb), five floors joined by magic circles, Recettear's own monsters at their own strength and its treasure, and its rule that whatever you find is lost (all but one item) if you fall. Bring your finds back and sell them in the shop. Recette, Tear and their customers appear with their own sprites and portraits, converted once from your own copy of Recettear."
 authors     = ["Francesco149"]
 target_games = ["sotes_en"]
 

@@ -1,37 +1,53 @@
--- recettear/dungeon.lua — THE HALL OF TRIALS: Recettear's first dungeon as side-view cave floors of this game.
+-- recettear/dungeon.lua — THE HALL OF TRIALS: Recettear's first dungeon as side-view floors of this game.
 --
 -- What comes from where:
---   * the floors: new every visit (a seed per run), drawn with the game's own Mountain Cave tiles (cave.lua) — rooms
---     240901..240905 (copies of 240120's record: cave tile set, not a town), maps DATA 4021..4025 re-served before
---     each floor loads (maps.set, loader api 1.13)
+--   * the floors: new every visit (a seed per run).  Recettear carves each floor as a maze on a grid of rooms; here
+--     the same maze stands upright (floors.lua): chambers joined by doorways and by shafts climbed on jump-through
+--     ledges.  1F / 2F are the Hall itself — brick halls, drawn with this game's grey ruin tiles (Recettear's Hall is
+--     a brick dungeon) — 3F / 4F the caves under it (the Mountain Cave tiles), 5F the vault.  Maps DATA 4021..4025,
+--     re-served before each floor loads (maps.set, loader api 1.13)
 --   * the monsters, per floor, and what each drops (common / rare): Recettear's own data/enemylist.txt ("dungeon 1"),
 --     read by setup.lua — green and red slimes, kobolds, green ropers, in their Recettear sprites over this game's
---     slime / kobold / myconid bodies and AI (actors.define)
+--     slime / kobold / myconid bodies and AI (actors.define).  Their strength is Recettear's too (see STATS)
 --   * the treasure chests: the game's own chests (map object 70220: retail opens them, "You found X inside the
 --     treasure chest."), filled from Recettear's dungeon-1 treasure (item.txt "ダ(1M)": M = how deep it lies)
 --   * the way down: Recettear's magic circle; standing on it asks "Go to the next floor?"
 --   * falling in battle: the game's own Game Over runs (Try Again / Return To Safety), then Recettear's rule —
 --     everything found in the Hall is lost except ONE item, and Tear brings you back to the shop
---   * floor 5 is the boss's den (the Crown Slime in Recettear): for now an empty den with the last treasure; the
---     exit there leads home.  The boss is future work.
+--   * floor 5 is the vault, as in Recettear (its Hall has no boss: a treasure chest and the way out)
 -- The opened state of chests is the game's own "object perpetuity" table (room +0x40ac, +0x1804: 2048 records
 -- {handle, state, map}; handle = room * 1000 + the object's id): each floor's records are freed when the floor is
 -- generated, so a new run finds the chests closed and the table never grows past one run's worth.
 local C = ...                                            -- the shared pieces from init.lua
 local S, SND, ACT, MAPS, A = C.S, C.SND, C.ACT, C.MAPS, C.A
-local cave = assert(C.loadmod('cave.lua'))
+local floors = assert(C.loadmod('floors.lua'))
 
 local H = {}
-local FLOORS = 5                                         -- 1..4 + the den
-local ROOM0, MAP0 = 240900, 4020                         -- floor n: room 240900 + n, DATA 4020 + n
-local LIKE = 240120                                      -- a Mountain Cave room (its record: tile set, BGM, kind)
-local TEMPLATE = 1048                                    -- its map: the header, the walk-in zone, the arch
+local FLOORS = 5                                         -- 1..4 + the vault
+-- floor n: its look and its maze (chambers across x down).  Recettear: 3 x 5 rooms on 1F..3F, 5 x 5 on 4F.
+local PLAN = {
+  { theme = 'hall', nc = 3, nr = 2 },
+  { theme = 'hall', nc = 4, nr = 2 },
+  { theme = 'cave', nc = 3, nr = 3 },
+  { theme = 'cave', nc = 4, nr = 3 },
+  { theme = 'hall', nc = 2, nr = 1, vault = true },
+}
+H.PLAN = PLAN
+-- floor n: room ROOM0[theme] + n (a copy of a room of that look: its record's backdrop / palette / kind), DATA 4020 + n
+local ROOM0, MAP0 = { cave = 240900, hall = 245900 }, 4020
+local LIKE = { cave = 240120, hall = 245140 }            -- a Mountain Cave room / a room of the ruins
+local TEMPLATE = 1048                                    -- a map for the header and the walk-in zone
 local CHEST_MAP, TORCH_MAP, FOE_MAP = 1049, 1049, 1047   -- maps holding a chest / a torch / a slime record to copy
 local F = { RUN = 991000020, CLEARS = 991000021, RUNS = 991000022 }   -- story flags (saved with the game)
 H.F = F
-local function room_of(n) return ROOM0 + n end
-local function floor_of(area) if area and area > ROOM0 and area <= ROOM0 + FLOORS then return area - ROOM0 end end
+local function room_of(n) return ROOM0[PLAN[n].theme] + n end
+-- (a save made on a floor of version 0.3 stands in 240900 + n whatever the look: those rooms stay defined)
+local function floor_of(area)
+  if not area then return end
+  for _, r0 in pairs(ROOM0) do if area > r0 and area <= r0 + FLOORS then return area - r0 end end
+end
 H.room_of, H.floor_of = room_of, floor_of
+function H.reload() floors = assert(C.loadmod('floors.lua')) return true end   -- (development: floors.lua again)
 
 -- a seeded generator (Park–Miller): the same seed + floor gives the same floor, so a saved run can be rebuilt
 local function rng_for(seed, n)
@@ -86,86 +102,126 @@ local function templates()
   return tmpl
 end
 
--- the arch: plane-0 piece 131041 frame 2 (tile set 1480) — 128 x 160 px, its cells left empty under it (as the game's
--- rooms do: DATA 1049 at its gate)
-local function arch(m, px, feet)
-  local cx, cy = math.floor(px / 32), math.floor(feet / 32) - 5
-  for y = cy - 1, cy + 4 do for x = cx - 1, cx + 3 do
-    if y >= cy then m:set_cell(0, y, x, { 0, 0, 0, 0, 0, 0, 0 }) end
-    if y >= 0 and x >= 0 then m:set_cell(1, y, x, { 0, 0, 0, 0, 0, 0, 0 }) end   -- no stalagmite in front of it
-  end end
-  m:set_cell(0, cy, cx, { 6640, 131041, 1480, 2, 0, 0, 0 })
+-- Recettear's own numbers (bmpdata.bin data/enemy.txt: HP / EXP / AT / DF), at this game's beginner scale: the green
+-- slime IS this game's Green Slime (attack 18, defence 14, 3 EXP on the SE's default difficulty), the others keep
+-- Recettear's proportions to it — so the Hall tops out below a Blue Slime (attack 30), the next monster the story
+-- brings.  (Version 0.3 only set HP: a kobold hit with the stock Kobold's attack 40 and gave its 58 EXP.)
+--   Recettear:  green 15 / 3 / 14 / 4    red 20 / 5 / 18 / 14    kobold 20 / 9 / 17 / 4    roper 15 / 10 / 16 / 4
+-- and Recettear's growth per floor below the first: HP x (1 + 0.2 k), attack x (1 + 0.1 k).
+local STATS = {
+  slime    = { hp = 30, atk = 18, def = 14, exp = 3,  gold = 4 },
+  redslime = { hp = 36, atk = 22, def = 20, exp = 5,  gold = 5 },
+  kobold   = { hp = 36, atk = 22, def = 14, exp = 9,  gold = 7 },
+  roper    = { hp = 30, atk = 21, def = 14, exp = 10, gold = 7 },
+}
+H.STATS = STATS
+local ST = { enold = { blk = 0x750, exp = 0xf0, gold = 0xf4 }, se = { blk = 0x760, exp = 0xf4, gold = 0xf8 } }
+local function strength(a, key, n)                        -- a monster of ours as it appears on floor n
+  local st, L = STATS[key], mod.edition == 'enold' and ST.enold or ST.se
+  local sb = a and a.ptr and mod.mem.read_u32(a.ptr + L.blk)
+  if not st or not sb or sb == 0 then return end
+  local k = math.max(0, (n or 1) - 1)
+  local hp = math.floor(st.hp * (1 + 0.2 * k) + 0.5)
+  mod.mem.write_i32(sb + 0x54, hp) mod.mem.write_i32(sb + 0x58, hp)
+  mod.mem.write_i32(sb + 0x64, math.floor(st.atk * (1 + 0.1 * k) + 0.5))
+  mod.mem.write_i32(sb + 0x68, st.def)
+  mod.mem.write_i32(sb + L.exp, st.exp + math.floor(k / 2))
+  mod.mem.write_i32(sb + L.gold, st.gold + k)
 end
 
 local function build(n, seed)
   local T = templates()
   local rng = rng_for(seed, n)
-  local den = n == FLOORS
-  local m, info = cave.build(MAPS, T.map, { w = den and 22 or (34 + 6 * n), h = 14, rng = rng, den = den })
-  -- the backdrop of a lit cave: the lighter rock wall (131001 frame 0, as the game's cave rooms use inside)
-  for i = 1, #m.cells do
-    local c = m.cells[i]
-    if c[2] == 131002 then c[1], c[2], c[4] = 5910, 131001, 0 end
-  end
-  local runs, first, last = info.runs, info.runs[1], info.runs[#info.runs]
-  arch(m, (first.x0 + 1) * 64, first.h * 64)                         -- where the party came in
-  arch(m, (last.x1 - 2) * 64, last.h * 64)                            -- the way on, behind the circle
-  local placed = { exit = { x = (last.x1 - 1) * 64, feet = last.h * 64 } }
-  -- the circle (a character of ours, inert), in front of the far arch
+  local plan = PLAN[n]
+  local m, info = floors.build(MAPS, T.map, { nc = plan.nc, nr = plan.nr, theme = plan.theme, rng = rng,
+                                              dais = plan.vault and 0 or 45, way = plan.vault and 0 or 1 })
+  local IW = floors.CW - floors.WALL
+  local start, exit, surface = info.start, info.exit, info.surface
+  local placed = { exit = { x = info.way.x + 64, feet = info.way.feet } }
+  -- the circle (a character of ours, inert), in front of the far archway
   -- (its sheet is re-set into the townsperson base's 96 px cell, feet on the bottom row: init.lua char_bank)
   m:add_character { like = T.npc, code = C.CODE.circle, x = placed.exit.x - 64, floor = placed.exit.feet,
                     cell_h = math.max(C.BASE_CELL_H, A.chars.circle and A.chars.circle.cell_h or 0), facing = 'right' }
-  -- torches on the walls of the taller stretches
-  for i, r in ipairs(runs) do                             -- (not the first / last stretch: the arches stand there)
-    if i > 1 and i < #runs and (r.h - r.c) >= 5 and (r.x1 - r.x0) >= 3 and rng(1, 3) <= 2 then
-      local t = MAPS.clone(T.torch)
-      t.rec[2], t.rec[3] = (r.x0 + rng(1, r.x1 - r.x0 - 1)) * 64, r.h * 64 - 176
-      m:add(t)
+  -- level floor in a chamber, away from doorways' landings, shafts and the arches: the interior columns to stand on
+  local function spots(ch, edge)
+    local t = {}
+    for i = edge and 0 or 1, IW - (edge and 1 or 2) do
+      local shaft = (ch.down and ch.x0 + i >= ch.down - 1 and ch.x0 + i <= ch.down + 4)
+      local ledges = (ch.up and ch.x0 + i >= ch.up and ch.x0 + i < ch.up + 4)
+      if not shaft and not ledges and not (ch.keep and ch.keep[i]) then t[#t + 1] = i end
     end
+    return t
   end
-  -- monsters: map records (the room loader makes them; presence 1 = always, 0 = 70 %)
-  local foes = foes_of(n)
-  local inner = {}
-  for i = 2, #runs - 1 do inner[#inner + 1] = runs[i] end
-  if not den and #foes > 0 and #inner > 0 then
-    for k = 1, 3 + 2 * n do
-      local r = inner[rng(1, #inner)]
-      local f = foes[rng(1, #foes)]
-      local code = C.CODE.hall[f.key]
-      if code then
-        local o = MAPS.clone(T.foe)
-        o.rec[5] = code
-        o.rec[2] = (r.x0 * 64) + rng(0, math.max(0, (r.x1 - r.x0) * 64))
-        o.rec[3] = r.h * 64 - 160                                      -- the body drops onto the floor
-        while #o.A < 7 do o.A[#o.A + 1] = 0 end
-        o.A[7] = (k <= 2 + n) and 1 or 0
-        m:add(o)
+  -- torches on the back wall
+  for _, ch in ipairs(info.chambers) do
+    for _, i in ipairs(spots(ch)) do
+      if rng(1, 6) == 1 and not (ch.dais and i >= ch.dais[1] and i <= ch.dais[2]) then
+        local t = MAPS.clone(T.torch)
+        t.rec[2], t.rec[3] = (ch.x0 + i) * 64 + 16, surface(ch, i) - info.T.torch_up
+        m:add(t)
       end
     end
   end
-  -- treasure chests: the game's own (object 70220: A[2] its id, A[7] the item or 1 / 2 / 3 = coins, A[8] count)
-  local nchest = den and 1 or rng(1, 2) + (n >= 3 and 1 or 0)
-  local spots = {}
-  for i = 2, #runs do if (runs[i].x1 - runs[i].x0) >= 2 then spots[#spots + 1] = runs[i] end end
-  for k = 1, nchest do
-    if #spots == 0 then break end
-    local r = den and last or table.remove(spots, rng(1, #spots))
-    local o = MAPS.clone(T.chest)
-    o.rec[2] = den and (last.x0 + 2) * 64 or (r.x0 + (rng(0, 1) == 0 and 0 or (r.x1 - r.x0 - 1))) * 64 + 16
-    o.rec[3] = r.h * 64 - 32
-    local id, count
-    if den then
-      local best
-      for _, e in ipairs(HALL.pool) do if e.depth >= 5 and C.item_of(e.id) and (not best or rng(1, 2) == 1) then best = C.item_of(e.id) end end
-      id, count = best or 3, best and 1 or 5
-    else
-      id, count = treasure(rng, n)
+  -- monsters: map records (the room loader makes them; presence 1 = always, 0 = 70 %).  As Recettear places them: in
+  -- groups, never in the room the party arrives in nor the exit's.
+  local foes = foes_of(n)
+  local rooms = {}
+  for _, ch in ipairs(info.chambers) do if ch ~= start and ch ~= exit then rooms[#rooms + 1] = ch end end
+  if not plan.vault and #foes > 0 and #rooms > 0 then
+    local groups = { 2, 1, 1, 1, 3 }
+    for i = #rooms, 2, -1 do local j = rng(1, i) rooms[i], rooms[j] = rooms[j], rooms[i] end
+    for gi, ch in ipairs(rooms) do
+      local sp = spots(ch, true)
+      for k = 1, #sp > 0 and groups[(gi - 1) % #groups + 1] or 0 do
+        local f = foes[rng(1, #foes)]
+        local code = C.CODE.hall[f.key]
+        if code then
+          local i = sp[rng(1, #sp)]
+          local o = MAPS.clone(T.foe)
+          o.rec[5] = code
+          o.rec[2] = (ch.x0 + i) * 64 + rng(0, 32)
+          o.rec[3] = surface(ch, i) - 192                               -- the body drops onto the floor
+          while #o.A < 7 do o.A[#o.A + 1] = 0 end
+          o.A[7] = (k == 1) and 1 or 0
+          m:add(o)
+        end
+      end
     end
-    while #o.A < 8 do o.A[#o.A + 1] = 0 end
-    o.A[2], o.A[7], o.A[8] = 500 + k, id, count
-    m:add(o)
   end
-  info.exit = placed.exit
+  -- treasure chests: the game's own (object 70220: A[2] its id, A[7] the item or 1 / 2 / 3 = coins, A[8] count), in
+  -- the dead ends first (Recettear marks cells off the way through), the farthest from the start first
+  local ends = {}
+  for _, ch in ipairs(rooms) do
+    local links = 0
+    for _ in pairs(ch.link) do links = links + 1 end
+    ends[#ends + 1] = { ch = ch, w = (links == 1 and 100 or 0) + ch.dist }
+  end
+  table.sort(ends, function(a, b) if a.w ~= b.w then return a.w > b.w end return a.ch.order < b.ch.order end)
+  local nchest = plan.vault and 1 or math.min(#ends, rng(1, 2) + (n >= 3 and 1 or 0))
+  for k = 1, nchest do
+    local ch = plan.vault and exit or ends[k].ch
+    local sp = spots(ch)
+    if #sp > 0 then
+      -- on the dais when the chamber has one (a little prize for the hop), else anywhere level
+      local i = sp[rng(1, #sp)]
+      if ch.dais then i = ch.dais[1] + rng(0, ch.dais[2] - ch.dais[1]) end
+      if plan.vault then i = math.min(IW - 2, exit.arch + 3) end
+      local o = MAPS.clone(T.chest)
+      o.rec[2], o.rec[3] = (ch.x0 + i) * 64 + 16, surface(ch, i) - 64
+      local id, count
+      if plan.vault then
+        local best
+        for _, e in ipairs(HALL.pool) do if e.depth >= 5 and C.item_of(e.id) and (not best or rng(1, 2) == 1) then best = C.item_of(e.id) end end
+        id, count = best or 3, best and 1 or 5
+      else
+        id, count = treasure(rng, n)
+      end
+      while #o.A < 8 do o.A[#o.A + 1] = 0 end
+      o.A[2], o.A[7], o.A[8] = 500 + k, id, count
+      m:add(o)
+    end
+  end
+  info.exit_at = placed.exit
   return m, info
 end
 
@@ -222,10 +278,11 @@ local function serve(n)
   local ok, err = MAPS.set(MAP0 + n, m, 'recettear')
   if not ok then return nil, err end
   run.info = info
+  run.exit = info.exit_at
   run.built = n
   local freed = forget(n)
-  mod.log(('hall: floor %d built (seed %d, %d x %d pieces, %d runs, %d objects; %d chest records freed)'):format(
-    n, run.seed, info.W, info.H, #info.runs, #m.objs, freed))
+  mod.log(('hall: floor %d built (seed %d, %s, %d x %d pieces, %d chambers, %d objects; %d chest records freed)'):format(
+    n, run.seed, info.theme, info.W, info.H, #info.chambers, #m.objs, freed))
   return true
 end
 -- go to floor n (from anywhere: the shop, the floor above)
@@ -309,11 +366,11 @@ end
 
 -- ── floors as they load ─────────────────────────────────────────────────────────────────────────────────────────
 local NEWS = {                                            -- a word from Tear as each floor opens
-  'The Hall of Trials. The guild sends its beginners here. Slimes, mostly. Stay on your feet.',
+  'The Hall of Trials. The guild sends its beginners here. Slimes, mostly. The way on is never where it was last time: look up as well as ahead.',
   'Red slimes from here on. They hit harder than the green ones.',
-  'Kobolds. They carry chestnuts, for some reason. And sometimes a sword.',
+  'The masonry ends here: these are the caves the Hall was built over. Kobolds live in them. They carry chestnuts, for some reason. And sometimes a sword.',
   'Ropers on this floor. Do not let them touch you. The next floor is the last.',
-  'The den at the bottom of the Hall. The guild\'s notes say a Crown Slime lives here... it appears to be out.',
+  'The vault at the bottom of the Hall. Whatever the guild left here for whoever gets this far is yours.',
 }
 local function arrive(n)
   run.floor = n
@@ -333,13 +390,13 @@ local function arrive(n)
   S.run(function(s)
     run.banner = n
     s:pause(30)
-    s:narrate(n < FLOORS and ('The Hall of Trials  -  %dF'):format(n) or 'The Hall of Trials  -  the Den')
+    s:narrate(n < FLOORS and ('The Hall of Trials  -  %dF'):format(n) or 'The Hall of Trials  -  the Vault')
     C.say(s, 'tear', NEWS[n] or NEWS[1])
   end, { what = 'hall floor ' .. n })
 end
 
 local function on_circle()
-  local e = run.info and run.info.exit
+  local e = run.exit
   if not e then return false end
   local me = mod.game.coordinates.player()
   if not me then return false end
@@ -442,16 +499,32 @@ end
 
 -- ── install ──────────────────────────────────────────────────────────────────────────────────────────────────────
 function H.install()
-  local T = templates()
+  templates()
   run.seed = 1
   for n = 1, FLOORS do                                   -- a first version of each floor (re-served before each visit)
     local m = build(n, 1)
     assert(MAPS.define(MAP0 + n, m, 'recettear'))
-    assert(mod.game.map.add_room { key = room_of(n), like = LIKE, map = MAP0 + n, town = false })
+    assert(mod.game.map.add_room { key = room_of(n), like = LIKE[PLAN[n].theme], map = MAP0 + n, town = false })
+    if room_of(n) ~= ROOM0.cave + n then                 -- version 0.3's room for this floor: a save made there loads
+      assert(mod.game.map.add_room { key = ROOM0.cave + n, like = LIKE.cave, map = MAP0 + n, town = false })
+    end
   end
   run.seed = nil
   if A.music and A.music.cave then
-    for n = 1, FLOORS do SND.room_music(room_of(n), mod.data_dir .. 'bgm_cave.wav') end
+    for n = 1, FLOORS do
+      SND.room_music(room_of(n), mod.data_dir .. 'bgm_cave.wav')
+      if room_of(n) ~= ROOM0.cave + n then SND.room_music(ROOM0.cave + n, mod.data_dir .. 'bgm_cave.wav') end
+    end
+  end
+  -- the monsters' strength, as each appears (Recettear's numbers: STATS), by the floor it stands on
+  for key, code in pairs(C.CODE.hall) do
+    local d = ACT.defined(code)
+    if d then
+      d.on_spawn = function(a)
+        local here = mod.game.map.get()
+        strength(a, key, here and floor_of(here.area) or 1)
+      end
+    end
   end
   mod.log(('hall: installed, floors %d..%d (DATA %d..%d), %d treasures, %d monster tables'):format(
     room_of(1), room_of(FLOORS), MAP0 + 1, MAP0 + FLOORS, #HALL.pool, #HALL.floors))
