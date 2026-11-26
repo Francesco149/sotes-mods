@@ -28,7 +28,8 @@ local RECETTE_X = 330                          -- where Recette stands (a map re
 local DOOR_X = 768 + 40                        -- the branch's door (the storeroom's, 10 columns further right)
 local CELLAR, CELLAR_MAP = 210147, 4011        -- the cellar under the branch (a fight room: town rules off)
 local H = { RECETTE = 991001, TEAR = 991002, HATCH = 991003 }
-local CODE = { recette = 50970, tear = 50971, slime = 51970, mushroom = 51971 }
+local CODE = { recette = 50970, tear = 50971, slime = 51970, mushroom = 51971, circle = 50989,
+               hall = { slime = 51975, redslime = 51972, kobold = 51973, roper = 51974 } }
 
 -- ── sprites: one bank per converted character, made on first use ─────────────────────────────────────────────────
 local banks, clips, faces = {}, {}, {}
@@ -210,12 +211,13 @@ local function pay(cp) mod.game.items.set_gold(gold() - cp) end
 
 -- the goods: what the game's own shops could sell (a price, not a story item, not clothes)
 local GOODS, BY_ID
-local CATS = { { 'Food and medicine', 200000, 209999 }, { 'Weapons', 110000, 119999 }, { 'Armour and accessories', 120000, 169999 } }
+local CATS = { { 'Food and medicine', 200000, 209999 }, { 'Weapons', 110000, 119999 }, { 'Armour and accessories', 120000, 169999 },
+               { 'Recettear goods', 70400000, 70409999 } }     -- (4: from the Hall of Trials; Tear does not order these)
 local function goods()
   if not GOODS then
     GOODS, BY_ID = {}, {}
     for _, it in ipairs(mod.game.items.catalog() or {}) do
-      if it.price and it.price >= 5 and it.id >= 110000 and it.id <= 209999 and it.name ~= '' then
+      if it.price and it.price >= 5 and ((it.id >= 110000 and it.id <= 209999) or (it.ours and it.id >= 70400000 and it.id <= 70409999)) and it.name ~= '' then
         for c, cat in ipairs(CATS) do
           if it.id >= cat[2] and it.id <= cat[3] then
             local g = { id = it.id, name = it.name, price = it.price, cat = c }
@@ -258,7 +260,9 @@ local function say(s, who, text, frame)
   end
   local bank = kind and face_bank(kind)
   if frame and A.faces[kind] and frame >= A.faces[kind] then frame = 0 end
-  return s:say(text, { name = name, actor = ptr and vp(ptr) or nil, portrait = bank, frame = frame or 0 })
+  -- a speaker who is not in the room (Tear down in the Hall of Trials): the box hangs on the party's leader, still
+  -- with her name and portrait — retail's message needs an actor (kind 0 with none shows nothing and does not wait)
+  return s:say(text, { name = name, actor = ptr and vp(ptr) or 'leader', portrait = bank, frame = frame or 0 })
 end
 
 -- ── Tear: the wholesale order, the loan ──────────────────────────────────────────────────────────────────────────
@@ -343,6 +347,26 @@ local ITEM_DEFS = {
   { 'strong', 4109, 202010, function(r)
       return { use = { a = 1, b = 2, c = 2 }, price = math.floor(r.price / 50), note = 'Attack +2 or 3, for good.' } end },
 }
+-- Every other Recettear item the setup read (the Hall of Trials' treasure and monster drops) becomes an item of this
+-- game the same way, by Recettear's category (its id / 100): a row of this game's own item of that kind, with
+-- Recettear's name, description, icon, price (pix / 2 as copper) and numbers (ATK / DEF / magic → attack / defense /
+-- spirit / resist).  This game has no bows, hats or shields of its own: bows take a knife's slot, headgear and
+-- shields the gloves'.
+local KIND = {
+  [0] = 110010, [1] = 112020, [2] = 111020, [3] = 112020,                 -- swords, daggers, staves, bows
+  [10] = 120010, [11] = 120010, [12] = 120020, [13] = 120020,             -- clothes, robes, breastplates, armour
+  [14] = 140005, [15] = 140005, [16] = 140005, [17] = 140005,             -- armbands, shields, hats, helms
+  [20] = 164010, [21] = 164010, [22] = 150010, [23] = 150010, [24] = 140005,   -- charms, necklaces, capes, mufflers, boots
+  [30] = 290010, [31] = 290010,                                           -- curios, materials: things to sell
+}
+local SPECIAL = {                                                         -- by Recettear id: what it does here
+  [3129] = function(r) return { like = 201010, use = { a = 30, b = 0 }, note = 'Restores 30 HP.' } end,      -- Chestnut
+  [3131] = function(r) return { like = 201020, note = 'Cures poison.' } end,                                 -- Powerful Antivenom
+}
+local function item_of(rid)                                                -- Recettear id → this game's id (if defined)
+  local id = 70400000 + rid
+  return mod.game.items.defined and mod.game.items.defined(id) and id or nil
+end
 local function define_items()
   local I = mod.game.items
   if not (I and I.define) then return mod.log('items: this loader has no items.define (api 1.12)') end
@@ -361,6 +385,30 @@ local function define_items()
       if sheet and r.icon then t.icon = sheet:crop(r.icon * 32, 0, 32, 32) end
       local ok, err = I.define(t)
       if ok then n = n + 1 else mod.log(('items: %s: %s'):format(d[1], tostring(err))) end
+    end
+  end
+  local done = {}
+  for _, d in ipairs(ITEM_DEFS) do done[d[2]] = true end
+  for key, r in pairs(A.items) do
+    local rid = tonumber(key)
+    if rid and not done[rid] then
+      local t
+      if SPECIAL[rid] then t = SPECIAL[rid](r)
+      else
+        local like = KIND[math.floor(rid / 100)]
+        if like then t = { like = like } end
+      end
+      if t then
+        local eq = t.like < 200000
+        t.id, t.name = 70400000 + rid, r.name
+        t.price = math.max(1, math.floor(r.price / 2))
+        if eq then t.attack, t.defense, t.spirit, t.resist = r.atk, r.def, r.mt, r.mf end
+        t.desc = t.note and (r.desc .. ' ' .. t.note) or r.desc
+        t.note = nil
+        if sheet and r.icon then t.icon = sheet:crop(r.icon * 32, 0, 32, 32) end
+        local ok, err = I.define(t)
+        if ok then n = n + 1 else mod.log(('items: %d: %s'):format(rid, tostring(err))) end
+      end
     end
   end
   mod.log(('items: %d of Recettear\'s items defined'):format(n))
@@ -440,7 +488,9 @@ end
 -- what they came for: something in stock they could pay for at list price, their favourite lines first
 local function pick_want(kind)
   local st = in_stock()
-  for _, cat in ipairs(kind.likes) do
+  local likes = { kind.likes[1], 4 }                       -- everyone's second choice: Recettear's own goods
+  for i = 2, #kind.likes do likes[#likes + 1] = kind.likes[i] end
+  for _, cat in ipairs(likes) do
     local fit = {}
     for _, e in ipairs(st) do if e.g.cat == cat and e.g.price <= kind.budget then fit[#fit + 1] = e.g end end
     if #fit > 0 then return fit[rnd(1, #fit)] end
@@ -668,6 +718,106 @@ local function take_home(s)
     end
   end
 end
+-- ── the Hall of Trials (dungeon.lua) ─────────────────────────────────────────────────────────────────────────────
+local hall                                               -- the module, loaded at install
+-- dungeon finds onto the shelves: Recettear's goods the party carries (unworn, unstored) become shop stock
+local function carried()
+  local t = {}
+  for _, it in ipairs(mod.game.items.list() or {}) do
+    if it.id >= 70400000 and it.id <= 70409999 and not it.stored and (it.owner or 0) == 0 then
+      local e = t[it.id] or { id = it.id, name = it.name, n = 0 }
+      e.n = e.n + math.max(1, it.count)
+      t[it.id] = e
+    end
+  end
+  local list = {}
+  for _, e in pairs(t) do list[#list + 1] = e end
+  table.sort(list, function(a, b) return a.id < b.id end)
+  return list
+end
+local function shelve_one(e, n)
+  local got = mod.game.items.take(e.id, n) or 0
+  if got > 0 then set_stock(e.id, stock(e.id) + got) end
+  return got
+end
+local function shelve(s)
+  local list = carried()
+  if #list == 0 then
+    say(s, 'recette', 'You are not carrying anything from Recettear\'s line. Bring me treasure from the Hall of Trials!', 2)
+    return
+  end
+  while true do
+    list = carried()
+    if #list == 0 then say(s, 'recette', 'All on the shelves! Now we just need customers.', 4) return end
+    local rows, total = {}, 0
+    for i, e in ipairs(list) do
+      if i <= 13 then rows[#rows + 1] = ('%-24s x%d'):format(e.name:sub(1, 24), e.n) end
+      total = total + e.n
+    end
+    rows[#rows + 1] = ('Everything (%d)'):format(total)
+    rows[#rows + 1] = 'Back'
+    local c = s:choose(rows, { w = 340 })
+    if not c or c == #rows then return end
+    if c == #rows - 1 then
+      local k = 0
+      for _, e in ipairs(list) do k = k + shelve_one(e, e.n) end
+      s:sound(SFX.coin)
+      say(s, 'recette', ('%d things on the shelves. They will sell for a pretty pix!'):format(k), 4)
+      return
+    end
+    shelve_one(list[c], 1)
+    s:sound(SFX.coin)
+  end
+end
+-- Recette's "The Hall of Trials": the rules once, then off you go -> true when the party is on its way
+local function hall_talk(s)
+  if not hall then say(s, 'recette', 'The guild has closed the Hall of Trials for now...', 2) return false end
+  if fget(hall.F.RUNS) == 0 then
+    say(s, 'tear', 'The Hall of Trials. The adventurers\' guild\'s practice dungeon, under the hill. Every visit it is laid out differently.', 1)
+    say(s, 'tear', 'Five floors. A magic circle on each takes you down. Monsters drop goods, and the chests hold more. Everything Recettear can sell.', 1)
+    say(s, 'tear', 'The guild\'s rule: if you fall down there, whatever you found stays down there. I can carry ONE thing out with you. Nothing more.', 2)
+    say(s, 'recette', 'So be careful! And bring everything back here: we put it on the shelves and sell it!', 4)
+  else
+    say(s, 'recette', ('Back to the Hall of Trials? You have been down %d time%s and reached the bottom %d.'):format(
+      fget(hall.F.RUNS), fget(hall.F.RUNS) == 1 and '' or 's', fget(hall.F.CLEARS)), 1)
+  end
+  say(s, 'recette', 'Shall we go?', 1)
+  if not s:yes_no() then return false end
+  say(s, 'recette', 'Good luck! Capitalism, ho!', 4)
+  S.after(function()
+    local ok, err = hall.start()
+    if not ok then mod.log('hall: ' .. tostring(err)) end
+  end)
+  return true
+end
+-- back from the Hall: how it went, and the finds onto the shelves
+local function welcome_back(s, how)
+  local got = hall.finds()
+  local n = 0
+  for _, f in ipairs(got) do n = n + f.n end
+  if how == 'cleared' then
+    s:sound(SFX.fanfare)
+    say(s, 'recette', 'You made it all the way to the bottom of the Hall of Trials! Yayifications!', 4)
+    say(s, 'tear', 'The guild will be impressed. The Crown Slime was not at home, I hear. Lucky.', 1)
+  elseif how == 'fallen' then
+    say(s, 'recette', 'Are you okay?! You look like you got sat on by a slime...', 2)
+  else
+    say(s, 'recette', 'Welcome back from the Hall of Trials!', 1)
+  end
+  if n > 0 then
+    say(s, 'recette', ('You brought back %d thing%s! Shall we put them on the shelves?'):format(n, n == 1 and '' or 's'), 4)
+    if s:yes_no() then
+      local k = 0
+      for _, f in ipairs(got) do k = k + shelve_one({ id = f.id }, f.n) end
+      s:sound(SFX.coin)
+      say(s, 'recette', ('%d on the shelves. Open the shop when you are ready!'):format(k), 4)
+    else
+      say(s, 'recette', 'Okay! You can shelve them any time. Just ask me.', 1)
+    end
+  end
+  hall.run.bag0 = nil
+end
+
 local wave = { on = false, slots = nil, typed = 0 }
 local function recette_talk(s)
   local me = actor_by_handle(H.RECETTE)
@@ -679,8 +829,14 @@ local function recette_talk(s)
   end
   say(s, 'recette', 'Welcome to Recettear, Tonkiness branch! What are we doing?', 1)
   while true do
-    local c = s:choose({ 'Open the shop', 'Take stock home', 'The cellar...', 'How does this work?', 'See you' }, { w = 280 })
-    if c == 1 then
+    local ROWS = { 'Open the shop', 'Take stock home', 'Shelve my finds', 'The Hall of Trials', 'The cellar...', 'How does this work?', 'See you' }
+    local pick = s:choose(ROWS, { w = 280 })
+    local row = pick and ROWS[pick]
+    local c = ({ ['Open the shop'] = 1, ['Take stock home'] = 2, ['The cellar...'] = 3, ['How does this work?'] = 4 })[row]
+    if row == 'Shelve my finds' then shelve(s)
+    elseif row == 'The Hall of Trials' then
+      if hall_talk(s) then return end
+    elseif c == 1 then
       local st = in_stock()
       local visitors = math.floor(fget(F.TRAFFIC) / 3)
       if #st == 0 then
@@ -817,20 +973,59 @@ local function install()
   for _, k in ipairs(KINDS) do
     if A.chars[k.key] then k.code = code; define(k.key, code, 50240, k.name); code = code + 1 end
   end
-  local function monster(name, c, display, hp, drops)     -- a slime underneath: its body, AI and clips; our sheet in its layout
-    if not A.chars[name] then return end
-    assert(ACT.define { code = c, base = 51010, name = display, hp = hp, drops = drops,
+  local function monster(name, c, display, hp, drops, base)  -- a retail monster underneath (default a slime): its body, AI
+    if not A.chars[name] then return end                      -- and clips; our sheet in its layout
+    assert(ACT.define { code = c, base = base or 51010, name = display, hp = hp, drops = drops,
       bank = function(p) return char_bank(name, mod.mem.read_u16(p + 0x48), true) end,
       on_death = function() wave.typed = math.max(0, wave.typed - 1) end })
   end
   -- what they drop (per mille; the first through the game's own drop roll): Recettear's items
   monster('slime', CODE.slime, 'Slime', 40, { { id = IT.sandwich, chance = 350 }, { id = IT.strong, chance = 60 } })
   monster('mushroom', CODE.mushroom, 'Walking Mushroom', 70, { { id = IT.ferromin, chance = 250 }, { id = IT.sandwich, chance = 250 } })
+  -- the Hall of Trials' monsters: Recettear's sprites over this game's bodies (green slime, red slime, kobold,
+  -- myconid for the roper — a slow ground monster); drops are set per floor (dungeon.lua)
+  -- (HP: Recettear's proportions — 15 / 20 / 20 / 15 there — at this game's beginner scale: a green slime here has 30;
+  -- the red slime underneath is a late-game monster with 150+ of its own)
+  monster(A.chars.greenslime and 'greenslime' or 'slime', CODE.hall.slime, 'Green Slime', 30, {}, 51010)
+  monster('redslime', CODE.hall.redslime, 'Red Slime', 45, {}, 51013)
+  monster('kobold', CODE.hall.kobold, 'Kobold', 60, {}, 51030)
+  monster('roper', CODE.hall.roper, 'Green Roper', 50, {}, 51024)
+  if A.chars.circle then define('circle', CODE.circle, 50240, 'Magic Circle') end
+  local function loadmod(name, ...)
+    local f, err = loadfile(mod.dir .. name)
+    if not f then return nil, err end
+    setfenv(f, getfenv(1))
+    return f(...)
+  end
+  if A.hall and A.chars.circle and MAPS.set then
+    local ok, H2 = pcall(loadmod, 'dungeon.lua', {
+      S = S, SND = SND, ACT = ACT, MAPS = MAPS, SPR = SPR, A = A, SFX = SFX, say = say, fget = fget, fset = fset,
+      CODE = CODE, SHOP = SHOP, HOUSE_MAP = HOUSE_MAP, BASE_CELL_H = BASE_CELL_H, item_of = item_of,
+      char_bank = char_bank, loadmod = loadmod })
+    if ok and H2 then
+      local ok2, err2 = pcall(H2.install)
+      if ok2 then hall = H2 else mod.log('hall: install failed: ' .. tostring(err2)) end
+    else
+      mod.log('hall: ' .. tostring(H2))
+    end
+  else
+    mod.log('hall: needs the setup\'s data from version 3 and loader api 1.13 (maps.set) — the Hall of Trials stays closed')
+  end
   S.on_talk(H.RECETTE, recette_talk, { name = 'Recette' })
   S.on_talk(H.TEAR, tear_talk, { name = 'Tear' })
-  S.on_tick(function() shop_tick() cellar_tick() end)
+  S.on_tick(function() shop_tick() cellar_tick() if hall then hall.tick() end end)
   mod.on_frame(function()
     traffic_frame()
+    if hall then
+      hall.frame()
+      local m0 = mod.game.map.get()
+      if m0 and m0.area == SHOP and hall.run.how and not hall.run.active and not mod.game.map.event()
+         and mod.game.map.warp_status() == 'idle' then
+        local how = hall.run.how
+        hall.run.how = nil
+        S.run(function(s) welcome_back(s, how) end, { what = 'hall welcome back' })
+      end
+    end
     local m = mod.game.map.get()
     if not m or m.area ~= SHOP then shop.intro_queued = false return end      -- asked again on the next visit (another save?)
     if not shop.intro_queued and not mod.game.map.event() then
@@ -844,7 +1039,7 @@ local function install()
   end
   mod.log(('installed: storeroom door (zone %d) -> the branch (room %d), cellar %d; %d goods'):format(DOOR_ZONE, SHOP, CELLAR, #goods()))
 end
-_G.recettear = { A = A, IT = IT, SHOP = SHOP, BACK = BACK, CELLAR = CELLAR, H = H, CODE = CODE, F = F, shop = shop, wave = wave,
+_G.recettear = { A = A, IT = IT, hall = function() return hall end, item_of = item_of, SHOP = SHOP, BACK = BACK, CELLAR = CELLAR, H = H, CODE = CODE, F = F, shop = shop, wave = wave,
                  level = level, stock = stock, set_stock = set_stock, fget = fget, fset = fset, goods = goods,
                  in_stock = in_stock, KINDS = KINDS, banks = banks, faces = faces, face_bank = face_bank }
 install()

@@ -163,6 +163,8 @@ local CHARS = {
   { 'girl', 37, 'mobu_girl01' }, { 'oldman', 38, 'mobu_jisan01' }, { 'guild', 39, 'mobu_guild_m' },
   { 'alouette', 48, 'alouette' }, { 'euria', 43, 'euria' }, { 'prime', 66, 'prime' },
   { 'slime', 4, 'sraim' }, { 'mushroom', 18, 'kinoko' },
+  -- setup 3: the Hall of Trials' cast (Recettear's dungeon 1: green / red slimes, kobolds, green ropers)
+  { 'greenslime', 5, 'sraim' }, { 'redslime', 8, 'sraim' }, { 'kobold', 20, 'kobolt' }, { 'roper', 24, 'ropper' },
 }
 -- name, the portrait files (bmp/ivent/<file>.tga) = its expressions, in order
 local FACES = {
@@ -174,16 +176,75 @@ local FACES = {
   { 'girl', { '21machi_00', '21machi_01' } }, { 'man', { '22machi_00', '22machi_01' } },
   { 'woman', { '25machi_00', '25machi_01' } }, { 'oldman', { '26machi_00', '26machi_01' } },
 }
-local MUSIC = { { 'shop', 'open.wav' }, { 'town', 'town.wav' } }
+local MUSIC = { { 'shop', 'open.wav' }, { 'town', 'town.wav' }, { 'cave', 'cave.wav' } }
 -- Items (setup 2): Recettear's own rows for the items the branch brings into this game, and their icons.
 --   data/item.txt  one line per item:  NNNN:R#name+plural#price#atk#def#mt#mf#attrs#stock#audience#desc1#desc2
 --                  (OpenRecet docs/formats/data-text.md; '/' in desc2 cuts it short)
 --   bmp/item/itemCC.bmp  the icons of category CC = NNNN / 100: 32 x 32 cells, 8 a row, cell = NNNN % 100,
 --                  key (0, 255, 0)
 local ITEMS = { 2, 1002, 4014, 4101, 4109 }     -- Longsword, Windbreaker, Ham Sandwich, Ferromin, Strong Concoction
+-- setup 3: THE HALL OF TRIALS (Recettear's first dungeon).  Its treasure = every item.txt row whose stock field
+-- carries a dungeon code `ダ(NM)` with N = 1 (M = how deep / rare, 1..9); its monsters and what they drop =
+-- data/enemylist.txt's `ダンジョン１` block (per floor range: monster[(variant)] : common drop # rare drop).
+local DA = '\131\95'                              -- ダ (Shift-JIS 83 5F)
+local DUNGEON1 = '\131\95\131\147\131\87\131\135\131\147\130\80'   -- ダンジョン１
+local DUNGEON2 = '\131\95\131\147\131\87\131\135\131\147\130\81'   -- ダンジョン２
+-- Recettear's monster names (Shift-JIS) → this mod's
+local MONSTER = { ['\131\88\131\137\131\67\131\128\151\206'] = 'slime',      -- スライム緑
+                  ['\131\88\131\137\131\67\131\128\144\212'] = 'redslime',   -- スライム赤
+                  ['\131\82\131\123\131\139\131\104'] = 'kobold',                       -- コボルド
+                  ['\131\141\129\91\131\112\129\91\151\206'] = 'roper' }    -- ローパー緑
+local function parse_hall(arc, txt)
+  local by_name, pool = {}, {}
+  for line in txt:gmatch('[^\r\n]+') do
+    local id = tonumber(line:match('^(%d%d%d%d):'))
+    if id then
+      local nm = (line:match('^%d+:[^#]*#([^#+]*)') or ''):match('^%s*(.-)%s*$')
+      if nm ~= '' then by_name[nm] = by_name[nm] or id end
+      local at = line:find(DA, 1, true)
+      if at then
+        local rest = line:sub(at + #DA)
+        while true do
+          local c, after = rest:match('^%((%d+)%)()')
+          if not c then break end
+          if #c == 2 and c:sub(1, 1) == '1' then pool[#pool + 1] = { id = id, depth = tonumber(c:sub(2, 2)) } end
+          rest = rest:sub(after)
+        end
+      end
+    end
+  end
+  local list = assert(arc:read('data/enemylist.txt'))
+  local floors, on, sec = {}, false, nil
+  for line in list:gmatch('[^\r\n]+') do
+    if line:find(DUNGEON1, 1, true) then on = true
+    elseif line:find(DUNGEON2, 1, true) then on = false
+    elseif on and line:sub(1, 2) ~= '//' then
+      local a, b = line:match('^f:(%d+)%-?(%d*)')
+      if a then sec = { lo = tonumber(a), hi = tonumber(b) or tonumber(a), foes = {} } floors[#floors + 1] = sec
+      elseif sec then
+        local nm, variant, d1, d2 = line:match('^([^%(%s:]+)%s*%(?(%d*)%)?%s*:%s*([^#]*)#?(.*)$')
+        local key = nm and MONSTER[nm]
+        if key then
+          d1, d2 = d1:match('^%s*(.-)%s*$'), (d2 or ''):match('^%s*(.-)%s*$')
+          sec.foes[#sec.foes + 1] = { key = key, variant = tonumber(variant), common = by_name[d1], rare = by_name[d2] }
+        end
+      end
+    end
+  end
+  return { pool = pool, floors = floors }, by_name
+end
 local function convert_items(arc)
   local txt = assert(arc:read('data/item.txt'))
   local want, rows = {}, {}                       -- rows by tostring(id) (assets.lua keys are strings)
+  local hall = parse_hall(arc, txt)
+  for _, e in ipairs(hall.pool) do ITEMS[#ITEMS + 1] = e.id end
+  for _, f in ipairs(hall.floors) do
+    for _, e in ipairs(f.foes) do
+      if e.common then ITEMS[#ITEMS + 1] = e.common end
+      if e.rare then ITEMS[#ITEMS + 1] = e.rare end
+    end
+  end
+  do local seen, u = {}, {} for _, id in ipairs(ITEMS) do if not seen[id] then seen[id] = true u[#u + 1] = id end end ITEMS = u end
   for _, id in ipairs(ITEMS) do want[id] = true end
   for line in txt:gmatch('[^\r\n]+') do
     local id = tonumber(line:match('^(%d%d%d%d):'))
@@ -195,9 +256,11 @@ local function convert_items(arc)
       local function n(i) return tonumber((f[i] or ''):match('%-?%d+')) or 0 end
       local d1, d2 = (f[11] or ''), (f[12] or ''):gsub('/.*$', '')
       rows[tostring(id)] = { name = name, plural = plural or name, price = n(3), atk = n(4), def = n(5), mt = n(6), mf = n(7),
+                   rank = tonumber(line:match('^%d+:(%d+)#')) or 0,
                    desc = (((d1:match('%-%s*$') and d1:gsub('%s+$', '') .. d2 or d1 .. ' ' .. d2)):gsub('%s+', ' '):match('^%s*(.-)%s*$')) }
     end
   end
+  rows.hall = hall
   local atlases, sheet, k = {}, image.new(32 * #ITEMS, 32), 0
   for _, id in ipairs(ITEMS) do
     local r = rows[tostring(id)]
@@ -316,12 +379,12 @@ local arc = open_archive(dir)
 mod.log(('setup: archive index: %d files'):format(arc.count))
 assert(fs.mkdir(OUT))
 local scale = max(40, min(100, tonumber(mod.config.get('scale')) or 75)) / 100
-local steps, step = #CHARS + #FACES + #MUSIC + 2, 0
+local steps, step = #CHARS + #FACES + #MUSIC + 3, 0
 local function tick(what) step = step + 1; progress(step / steps, what) end
 
 tick('Reading the sprite layout table…')
 local form = assert(arc:read('bmp/chr/formdata.bin'))
-local meta = { version = 2, chars = {}, faces = {}, music = {}, items = {}, source = dir }
+local meta = { version = 3, chars = {}, faces = {}, music = {}, items = {}, source = dir }
 for _, c in ipairs(CHARS) do
   tick('Sprites: ' .. c[1])
   local ok, info, why = pcall(convert_char, arc, form, c, scale)
@@ -346,12 +409,38 @@ end
 tick('Items…')
 local okI, items = pcall(convert_items, arc)
 if okI then
+  meta.hall, items.hall = items.hall, nil
   meta.items = items
   local nI = 0 for _ in pairs(items) do nI = nI + 1 end
+  mod.log(('setup: the Hall of Trials: %d treasures, %d floor tables'):format(#meta.hall.pool, #meta.hall.floors))
   mod.log(('setup: %d items (rows + icons)'):format(nI))
 else
   mod.log('setup: items skipped: ' .. tostring(items))
 end
+tick('The way down…')
+local okC, why = pcall(function()
+  -- Recettear's floor exit: the magic circle (bmp/mahoujin.bmp, red light on black) seen from the side — an ellipse
+  -- lying on the floor, 4 frames of a slow pulse.  Light = opacity (the black is the transparent key).
+  local src = assert(image.decode(assert(arc:read('bmp/mahoujin.bmp'))))
+  local W, H, N = 128, 40, 4
+  local flat = src:scale(W, H)
+  local sheet = image.new(W * N * 2, H)                -- frames 0..3, then the same four again (the facing-left half)
+  for f = 0, 2 * N - 1 do
+    local gain = ({ 1.0, 0.85, 0.7, 0.85 })[f % N + 1]
+    for y = 0, H - 1 do
+      for x = 0, W - 1 do
+        local r, g, b = flat:get(x, y)
+        local v = math.max(r, g, b)
+        if v >= 40 then sheet:set(f * W + x, y, math.min(255, math.floor(r * gain + 30)), math.min(255, math.floor(g * gain + 10)), math.min(255, math.floor(b * gain + 10)), 255) end
+      end
+    end
+  end
+  local ix = image.quantize(sheet, { colors = 64 })
+  assert(fs.write(OUT .. 'chr_circle.osi', image.pack_indexed(ix)))
+  meta.chars.circle = { cell_w = W, cell_h = H, n = N, cols = 2 * N, colors = ix.colors, lift = 0,
+                        anims = { { frames = { 0, 1, 2, 3, 2, 1 }, dur = { 12, 12, 12, 12, 12, 12 } } } }
+end)
+if not okC then mod.log('setup: circle skipped: ' .. tostring(why)) end
 arc:close()
 for _, m in ipairs(MUSIC) do
   tick('Music: ' .. m[1])

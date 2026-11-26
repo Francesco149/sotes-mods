@@ -1,18 +1,18 @@
 [mod]
 id          = "recettear"
 name        = "Recettear: Tonkiness Branch"
-version     = "0.2.0"
-description = "A Recettear crossover. Recette and Tear open a branch of their item shop in the storeroom behind Arche's family shop: buy stock wholesale from Tear, mind the counter and haggle with customers (Recettear's own pricing rules), level up as a merchant, pay off the branch's loan. Tear hands over a starter kit of Recettear's own items (added to the game as new items, with their own icons), and the cellar's monsters drop them. Recette, Tear and their customers appear with their own sprites and portraits, converted once from your own copy of Recettear."
+version     = "0.3.0"
+description = "A Recettear crossover. Recette and Tear open a branch of their item shop in the storeroom behind Arche's family shop: buy stock wholesale from Tear, mind the counter and haggle with customers (Recettear's own pricing rules), level up as a merchant, pay off the branch's loan. Tear hands over a starter kit of Recettear's own items (added to the game as new items, with their own icons), and the cellar's monsters drop them. Recette can also send you into the Hall of Trials, Recettear's first dungeon rebuilt as a side-scrolling cave of this game: a new layout every visit, five floors joined by magic circles, Recettear's own monsters and treasure, and its rule that whatever you find is lost (all but one item) if you fall. Bring your finds back and sell them in the shop. Recette, Tear and their customers appear with their own sprites and portraits, converted once from your own copy of Recettear."
 authors     = ["Francesco149"]
 target_games = ["sotes_en"]
 
 [loader]
-api         = "1.12"
+api         = "1.13"
 min_version = "0.1.0"
 
 [setup]
-version = "2"
-summary = "Finds your Steam copy of Recettear: An Item Shop's Tale, reads its data files (bin\\data*.bin, lnkdatas.bin, bgm) and converts character sprites, portraits, five item icons and descriptions, and two music tracks into this game's formats. The result (about 30 MB) is written to the mod_data\\recettear folder beside the game. Nothing in Recettear's folder or in this game's files is changed, and nothing is sent anywhere."
+version = "3"
+summary = "Finds your Steam copy of Recettear: An Item Shop's Tale, reads its data files (bin\\data*.bin, lnkdatas.bin, bgm) and converts character sprites, portraits, item icons and descriptions, the Hall of Trials' monster and treasure tables, the magic circle, and three music tracks into this game's formats. The result (about 30 MB) is written to the mod_data\\recettear folder beside the game. Nothing in Recettear's folder or in this game's files is changed, and nothing is sent anywhere."
 
 [config.recettear_dir]
 type = "string"
