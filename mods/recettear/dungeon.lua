@@ -116,8 +116,8 @@ local function build(n, seed)
   m:add_character { like = T.npc, code = C.CODE.circle, x = placed.exit.x - 64, floor = placed.exit.feet,
                     cell_h = math.max(C.BASE_CELL_H, A.chars.circle and A.chars.circle.cell_h or 0), facing = 'right' }
   -- torches on the walls of the taller stretches
-  for i, r in ipairs(runs) do
-    if (r.h - r.c) >= 5 and (r.x1 - r.x0) >= 3 and rng(1, 3) <= 2 then
+  for i, r in ipairs(runs) do                             -- (not the first / last stretch: the arches stand there)
+    if i > 1 and i < #runs and (r.h - r.c) >= 5 and (r.x1 - r.x0) >= 3 and rng(1, 3) <= 2 then
       local t = MAPS.clone(T.torch)
       t.rec[2], t.rec[3] = (r.x0 + rng(1, r.x1 - r.x0 - 1)) * 64, r.h * 64 - 176
       m:add(t)

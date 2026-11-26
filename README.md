@@ -33,9 +33,31 @@ never blocks the story: customers only come back after you have been out visitin
 | ![The first-time setup prompt](docs/img/setup-consent.png) | |
 | The one-time setup asks first, with a security warning | |
 
+#### The Hall of Trials
+
+Recette can also send you into **the Hall of Trials**, Recettear's first dungeon, rebuilt as a side-scrolling
+cave of this game. Every visit lays it out anew: five floors (the fifth is the den at the bottom), each a
+string of chambers and tunnels drawn with the game's own Mountain Cave tiles. Recettear's monsters from that
+dungeon live there — green and red slimes, kobolds, green ropers — with the drops Recettear gives them, and
+the game's own treasure chests hold Recettear's dungeon-1 treasure (more and better the deeper you go). A
+magic circle on each floor asks "Go to the next floor?"; the den's circle leads home. If the party falls, the
+game's own Game Over runs as usual, and then Recettear's rule applies: everything you found down there is
+lost except one item, which Tear carries out with you. Back at the branch, Recette puts your finds on the
+shelves, and customers like Recettear's goods.
+
+| | |
+|---|---|
+| ![A Hall of Trials floor](docs/img/hall-floor.png) | ![The magic circle](docs/img/hall-circle.png) |
+| A floor of the Hall: the game's cave tiles, an arch at each end, Recettear's monsters | The magic circle in front of the way down |
+| ![Recettear's monsters](docs/img/hall-monsters.png) | ![Fallen](docs/img/hall-fallen.png) |
+| Green roper, kobold, red and green slimes, in their Recettear sprites | After a Game Over: Tear explains the guild's rule |
+
+The boss of the den (Recettear's Crown Slime) is not in yet: for now the den is empty but for its treasure.
+(These four screenshots are from a Wine run.)
+
 **You need your own copy of Recettear** (Steam). On first start the loader shows the prompt above; if
 you agree, the mod finds Recettear through Steam, converts the sprites, portraits and shop music it
-needs (about 20 seconds) and stores them in `mod_data\recettear` beside the game. Decline and the game
+needs (about 25 seconds) and stores them in `mod_data\recettear` beside the game. Decline and the game
 starts without the mod.
 
 How each piece gets into the game, and how much of it is the game's own code:
@@ -49,15 +71,19 @@ How each piece gets into the game, and how much of it is the game's own code:
 | Shop rules, stock, loan | Lua. Progress is stored in the game's story flags, so it is saved with your save file | Custom logic; storage is native |
 | Music | A WAV played by the loader through DirectSound; while it plays the loader tells the engine the room has no music, so the game fades its own out and back in | Not native: a separate audio stream. It follows the game's music volume setting |
 | Sound effects | Synthesized in Lua and played through the game's own sound pools | Native playback |
-| Recettear's items | Five of Recettear's items (Longsword, Windbreaker, Ham Sandwich, Ferromin, Strong Concoction) become new item definitions added past the game's own item table, each a copy of the game's item of that kind with Recettear's name, description, numbers and icon. Tear hands them over as a starter kit; the cellar's slimes and mushrooms drop some | Fully native: the game's own inventory, menus, equipping, item use, floor pickups, drop roll and save files. Nothing of the game's is replaced. The icons are added below the game's own icon sheet |
+| Recettear's items | 42 of Recettear's items (Tear's starter kit, the Hall of Trials' treasure and monster drops) become new item definitions added past the game's own item table, each a copy of the game's item of that kind (a sword, armour, a charm, a herb...) with Recettear's name, description, numbers and icon | Fully native: the game's own inventory, menus, equipping, item use, floor pickups, drop roll and save files. Nothing of the game's is replaced. The icons are added below the game's own icon sheet |
+| The Hall of Trials | Each floor's map is generated in Lua from the game's own cave rooms' tiles (the same pieces, edges and collision shapes the game's rooms use) and served through the resource overlay before the floor loads. Monsters, chests, torches and the circle are ordinary map objects; the tables (monsters, drops, treasure) are read from your Recettear | Native: the game's map loader, collision, monsters, chests (and their "You found..." messages), drop roll, Game Over. The floor layout, the circle's prompt and the lose-your-finds rule are Lua |
 
 Known limitations:
 
 - Tested on the English Special Edition only (Wine and Windows). The old English
   edition and the Japanese edition have not been run with this mod.
 - A save made inside the new rooms will not load if the mod is removed.
-- You sell stock bought from Tear, not items from your own bag (the loader has no item-removal call yet).
-- Only five of Recettear's items are added so far, and Tear's wholesale stock is still the game's own items.
+- You can put Recettear's goods from your bag on the shelves, but not the game's own items; Tear's wholesale stock
+  is still the game's own items.
+- The Hall of Trials has no boss yet, and no Recettear floor events ("news").  The game's Game Over choices both
+  reload a point from before the run (the Hall is entered by a warp): anything else done since then is undone,
+  as with any Game Over.
 - A save holding Recettear's items, loaded without the mod, loses those items (the game drops items it does not know).
 - Customers and Recette's cast are side-view sprites standing on townsperson bodies: they walk and
   talk, but they are not party members and cannot fight alongside you.
@@ -94,7 +120,7 @@ Special Edition (its automated test passes on all three editions).
 | `autoload` | Auto-Load Save | Launch straight into a save (config: `slot`). Orchestrates the loader's `mod.game.save` op. |
 | `ennse_voice` | Japanese Voice Patch (EN-SE) | English text + Japanese dialogue voices. You supply `sotesx_s.dll` from your own JP copy. |
 | `trainer` | Trainer | God mode / heal / gold / teleport to the cursor (F7) / warp to any room / give any item, every edition — over the loader's sandbox ops (api 1.2). Panels in the loader UI; `_G.trainer` for agents. Unreleased (0.1.0). |
-| `recettear` | Recettear: Tonkiness Branch | A Recettear crossover (loader api 1.12): Recette and Tear run a branch of their shop behind Arche's family shop — wholesale stock, customers who haggle, merchant levels, a loan, and a starter kit of Recettear's own items added as new items. Sprites, portraits, item icons and music are converted once from your own copy of Recettear. See the showcase above. Unreleased (0.2.0). |
+| `recettear` | Recettear: Tonkiness Branch | A Recettear crossover (loader api 1.13): Recette and Tear run a branch of their shop behind Arche's family shop — wholesale stock, customers who haggle, merchant levels, a loan, Recettear's own items added as new items, and the Hall of Trials (Recettear's first dungeon as a new layout every visit, with its monsters, treasure and lose-your-finds rule). Sprites, portraits, item icons, tables and music are converted once from your own copy of Recettear. See the showcase above. Unreleased (0.3.0). |
 | `testroom` | Test Room | Proof of concept for custom content (loader api 1.10): a new door in Arche's house leads to the Mod Hall, a new room built from stock tiles where NPCs drive the game's own systems from Lua (shop, inn, books, warps, synthesized sounds), plus custom sprites — a recoloured NPC, Bit (a new character type under its own code, placed by the map: own sprite sheet + animations + a 13-second dance to his own tune) and the Glitch Cube (a new monster type: own sheet + Lua behaviours). The custom sprites live in sprite banks past the game's own. Maps are built at load from your own game data; the only shipped art is the mod's own (`bit.bmp`, `cube.bmp`, drawn by `art/make_art.py`). Unreleased (0.4.1). |
 
 ## Status
