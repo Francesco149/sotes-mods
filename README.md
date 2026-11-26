@@ -49,6 +49,7 @@ How each piece gets into the game, and how much of it is the game's own code:
 | Shop rules, stock, loan | Lua. Progress is stored in the game's story flags, so it is saved with your save file | Custom logic; storage is native |
 | Music | A WAV played by the loader through DirectSound; while it plays the loader tells the engine the room has no music, so the game fades its own out and back in | Not native: a separate audio stream. It follows the game's music volume setting |
 | Sound effects | Synthesized in Lua and played through the game's own sound pools | Native playback |
+| Recettear's items | Five of Recettear's items (Longsword, Windbreaker, Ham Sandwich, Ferromin, Strong Concoction) become new item definitions added past the game's own item table, each a copy of the game's item of that kind with Recettear's name, description, numbers and icon. Tear hands them over as a starter kit; the cellar's slimes and mushrooms drop some | Fully native: the game's own inventory, menus, equipping, item use, floor pickups, drop roll and save files. Nothing of the game's is replaced. The icons are added below the game's own icon sheet |
 
 Known limitations:
 
@@ -56,7 +57,8 @@ Known limitations:
   edition and the Japanese edition have not been run with this mod.
 - A save made inside the new rooms will not load if the mod is removed.
 - You sell stock bought from Tear, not items from your own bag (the loader has no item-removal call yet).
-- Recettear's own items are not added to the game; the shop trades the game's existing items.
+- Only five of Recettear's items are added so far, and Tear's wholesale stock is still the game's own items.
+- A save holding Recettear's items, loaded without the mod, loses those items (the game drops items it does not know).
 - Customers and Recette's cast are side-view sprites standing on townsperson bodies: they walk and
   talk, but they are not party members and cannot fight alongside you.
 - The haggling follows Recettear's idea (a price limit per customer, near-pin bonus, counter-offers,
@@ -92,7 +94,7 @@ Special Edition (its automated test passes on all three editions).
 | `autoload` | Auto-Load Save | Launch straight into a save (config: `slot`). Orchestrates the loader's `mod.game.save` op. |
 | `ennse_voice` | Japanese Voice Patch (EN-SE) | English text + Japanese dialogue voices. You supply `sotesx_s.dll` from your own JP copy. |
 | `trainer` | Trainer | God mode / heal / gold / teleport to the cursor (F7) / warp to any room / give any item, every edition — over the loader's sandbox ops (api 1.2). Panels in the loader UI; `_G.trainer` for agents. Unreleased (0.1.0). |
-| `recettear` | Recettear: Tonkiness Branch | A Recettear crossover (loader api 1.11): Recette and Tear run a branch of their shop behind Arche's family shop — wholesale stock, customers who haggle, merchant levels, a loan. Sprites, portraits and music are converted once from your own copy of Recettear. See the showcase above. Unreleased (0.1.0). |
+| `recettear` | Recettear: Tonkiness Branch | A Recettear crossover (loader api 1.12): Recette and Tear run a branch of their shop behind Arche's family shop — wholesale stock, customers who haggle, merchant levels, a loan, and a starter kit of Recettear's own items added as new items. Sprites, portraits, item icons and music are converted once from your own copy of Recettear. See the showcase above. Unreleased (0.2.0). |
 | `testroom` | Test Room | Proof of concept for custom content (loader api 1.10): a new door in Arche's house leads to the Mod Hall, a new room built from stock tiles where NPCs drive the game's own systems from Lua (shop, inn, books, warps, synthesized sounds), plus custom sprites — a recoloured NPC, Bit (a new character type under its own code, placed by the map: own sprite sheet + animations + a 13-second dance to his own tune) and the Glitch Cube (a new monster type: own sheet + Lua behaviours). The custom sprites live in sprite banks past the game's own. Maps are built at load from your own game data; the only shipped art is the mod's own (`bit.bmp`, `cube.bmp`, drawn by `art/make_art.py`). Unreleased (0.4.1). |
 
 ## Status

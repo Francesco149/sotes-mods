@@ -175,6 +175,44 @@ local FACES = {
   { 'woman', { '25machi_00', '25machi_01' } }, { 'oldman', { '26machi_00', '26machi_01' } },
 }
 local MUSIC = { { 'shop', 'open.wav' }, { 'town', 'town.wav' } }
+-- Items (setup 2): Recettear's own rows for the items the branch brings into this game, and their icons.
+--   data/item.txt  one line per item:  NNNN:R#name+plural#price#atk#def#mt#mf#attrs#stock#audience#desc1#desc2
+--                  (OpenRecet docs/formats/data-text.md; '/' in desc2 cuts it short)
+--   bmp/item/itemCC.bmp  the icons of category CC = NNNN / 100: 32 x 32 cells, 8 a row, cell = NNNN % 100,
+--                  key (0, 255, 0)
+local ITEMS = { 2, 1002, 4014, 4101, 4109 }     -- Longsword, Windbreaker, Ham Sandwich, Ferromin, Strong Concoction
+local function convert_items(arc)
+  local txt = assert(arc:read('data/item.txt'))
+  local want, rows = {}, {}                       -- rows by tostring(id) (assets.lua keys are strings)
+  for _, id in ipairs(ITEMS) do want[id] = true end
+  for line in txt:gmatch('[^\r\n]+') do
+    local id = tonumber(line:match('^(%d%d%d%d):'))
+    if id and want[id] then
+      local f = {}
+      for v in (line .. '#'):gmatch('([^#]*)#') do f[#f + 1] = v end
+      local name, plural = (f[2] or ''):match('^%s*(.-)%s*$'), nil
+      if name:find('+', 1, true) then name, plural = name:match('^(.-)%+(.*)$') end
+      local function n(i) return tonumber((f[i] or ''):match('%-?%d+')) or 0 end
+      local d1, d2 = (f[11] or ''), (f[12] or ''):gsub('/.*$', '')
+      rows[tostring(id)] = { name = name, plural = plural or name, price = n(3), atk = n(4), def = n(5), mt = n(6), mf = n(7),
+                   desc = (((d1:match('%-%s*$') and d1:gsub('%s+$', '') .. d2 or d1 .. ' ' .. d2)):gsub('%s+', ' '):match('^%s*(.-)%s*$')) }
+    end
+  end
+  local atlases, sheet, k = {}, image.new(32 * #ITEMS, 32), 0
+  for _, id in ipairs(ITEMS) do
+    local r = rows[tostring(id)]
+    if r then
+      local cat = floor(id / 100)
+      if not atlases[cat] then atlases[cat] = assert(image.decode(assert(arc:read(('bmp/item/item%02d.bmp'):format(cat))))):key(0, 255, 0) end
+      local a, cell = atlases[cat], id % 100
+      sheet:blit(a, (cell % 8) * 32, floor(cell / 8) * 32, 32, 32, k * 32, 0)
+      r.icon = k
+      k = k + 1
+    end
+  end
+  assert(fs.write(OUT .. 'items.bmp', sheet:bmp()))          -- transparent = magenta
+  return rows
+end
 
 local function lua_literal(v, ind)
   ind = ind or ''
@@ -278,12 +316,12 @@ local arc = open_archive(dir)
 mod.log(('setup: archive index: %d files'):format(arc.count))
 assert(fs.mkdir(OUT))
 local scale = max(40, min(100, tonumber(mod.config.get('scale')) or 75)) / 100
-local steps, step = #CHARS + #FACES + #MUSIC + 1, 0
+local steps, step = #CHARS + #FACES + #MUSIC + 2, 0
 local function tick(what) step = step + 1; progress(step / steps, what) end
 
 tick('Reading the sprite layout table…')
 local form = assert(arc:read('bmp/chr/formdata.bin'))
-local meta = { version = 1, chars = {}, faces = {}, music = {}, source = dir }
+local meta = { version = 2, chars = {}, faces = {}, music = {}, items = {}, source = dir }
 for _, c in ipairs(CHARS) do
   tick('Sprites: ' .. c[1])
   local ok, info, why = pcall(convert_char, arc, form, c, scale)
@@ -304,6 +342,15 @@ for _, f in ipairs(FACES) do
   else
     mod.log(('setup: portrait %s skipped: %s'):format(f[1], tostring(sheet)))
   end
+end
+tick('Items…')
+local okI, items = pcall(convert_items, arc)
+if okI then
+  meta.items = items
+  local nI = 0 for _ in pairs(items) do nI = nI + 1 end
+  mod.log(('setup: %d items (rows + icons)'):format(nI))
+else
+  mod.log('setup: items skipped: ' .. tostring(items))
 end
 arc:close()
 for _, m in ipairs(MUSIC) do

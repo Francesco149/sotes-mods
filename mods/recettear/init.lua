@@ -1,4 +1,4 @@
--- recettear — a Recettear crossover for Fortune Summoners (loader api 1.11).
+-- recettear — a Recettear crossover for Fortune Summoners (loader api 1.12).
 --
 -- Recette and Tear open a branch of their item shop behind Arche's family shop:
 --   * a NEW DOOR in the storeroom behind the shop (210141) leads to "Recettear, Tonkiness Branch" (a new room)
@@ -182,7 +182,7 @@ end
 -- ── the save: everything the branch remembers lives in story flags (saved with the game) ────────────────────────
 local FL = mod.game.flags.story
 local F = { XP = 991000001, LOAN = 991000002, SALES = 991000003, INTRO = 991000004, TRAFFIC = 991000005,
-            BEST = 991000006, CELLAR = 991000007, STOCK = 992000000 }
+            BEST = 991000006, CELLAR = 991000007, KIT = 991000008, STOCK = 992000000 }
 local function fget(id) local v = FL.get(id) return v or 0 end
 local function fset(id, v) FL.set(id, v, v == 0 and 0 or 1) end        -- (v, v2) = (0, 0) clears the flag
 local function stock(id) return fget(F.STOCK + id) end
@@ -326,9 +326,61 @@ local function loan_menu(s)
     end
   end
 end
+-- ── Recettear's own items, as new items of this game (loader api 1.12) ─────────────────────────────────────────────
+-- Each is a new item row (items.define: nothing of the game's is replaced) cloned from the game's own item of that
+-- kind, with Recettear's name, description, numbers and icon (read from the user's Recettear by setup.lua).  The ids
+-- are 70400000 + Recettear's item number (70400 = its Steam app): what saves store, so they never change.  A save
+-- holding one, loaded without this mod, loses those items (the game drops records of unknown items).
+local IT = { longsword = 70400002, windbreaker = 70401002, sandwich = 70404014, ferromin = 70404101, strong = 70404109 }
+local ITEM_DEFS = {
+  -- key, Recettear id, the game's item it works like, what changes (price: Recettear's pix over the divisor)
+  { 'longsword', 2, 110010, function(r) return { attack = r.atk, price = math.floor(r.price / 2) } end },        -- Bronze Sword
+  { 'windbreaker', 1002, 120010, function(r) return { defense = r.def, price = math.floor(r.price / 2) } end },  -- Cloth Armor
+  { 'sandwich', 4014, 201010, function(r)                                                                          -- Herb: HP a + b*rand
+      return { use = { a = r.atk, b = 0 }, price = math.floor(r.price / 50), note = ('Restores %d HP.'):format(r.atk) } end },
+  { 'ferromin', 4101, 202010, function(r)                                                                          -- Power Drop: a stat for good
+      return { use = { a = 5, b = 5, c = 5 }, price = math.floor(r.price / 10), note = 'Max HP +5 to 9, for good.' } end },
+  { 'strong', 4109, 202010, function(r)
+      return { use = { a = 1, b = 2, c = 2 }, price = math.floor(r.price / 50), note = 'Attack +2 or 3, for good.' } end },
+}
+local function define_items()
+  local I = mod.game.items
+  if not (I and I.define) then return mod.log('items: this loader has no items.define (api 1.12)') end
+  if not A.items then return mod.log('items: setup data from before items (re-run the setup)') end
+  local raw = fs.read(mod.data_dir .. 'items.bmp')
+  local sheet = raw and image.decode(raw)
+  if sheet then sheet:key(255, 0, 255) end
+  local n = 0
+  for _, d in ipairs(ITEM_DEFS) do
+    local r = A.items[tostring(d[2])]
+    if r then
+      local t = d[4](r)
+      t.id, t.like, t.name = IT[d[1]], d[3], r.name
+      t.desc = t.note and (r.desc .. ' ' .. t.note) or r.desc
+      t.note = nil
+      if sheet and r.icon then t.icon = sheet:crop(r.icon * 32, 0, 32, 32) end
+      local ok, err = I.define(t)
+      if ok then n = n + 1 else mod.log(('items: %s: %s'):format(d[1], tostring(err))) end
+    end
+  end
+  mod.log(('items: %d of Recettear\'s items defined'):format(n))
+end
+
+-- the starter kit Tear hands over (in the first-visit scene; once per save — saves from before 0.2 get it from her)
+local KIT = { { 'longsword', 1 }, { 'windbreaker', 1 }, { 'sandwich', 3 }, { 'strong', 1 }, { 'ferromin', 1 } }
+local function give_kit(s)
+  if fget(F.KIT) ~= 0 or not (mod.game.items.defined and mod.game.items.defined(IT.longsword)) then return end
+  fset(F.KIT, 1)
+  say(s, 'tear', 'First, a starter kit from our own stock. No merchant of ours goes adventuring bare-handed.')
+  for _, k in ipairs(KIT) do s:give(IT[k[1]], k[2]) end
+  say(s, 'recette', 'A real Recettear longsword! Ooh, and sandwiches! Can I have one?', 4)
+  say(s, 'tear', 'No.')
+end
+
 local function tear_talk(s)
   local a = actor_by_handle(H.TEAR)
   if a then anim(a.ptr, 'tear', 4) end                                     -- her notebook
+  give_kit(s)                                                              -- a save from before 0.2: the kit now
   say(s, 'tear', 'Yes? Stock, or the loan?')
   while true do
     local rows
@@ -675,6 +727,7 @@ local function intro(s)
   say(s, 'recette', 'Your dad said we could use the back room if we kept out of his way. Is he not the nicest?', 4)
   say(s, 'tear', 'We are opening a branch here. You know this town and you can carry things. We could use a hand at the counter.')
   say(s, 'recette', 'I do the selling, Tear does the sums, and you get a cut of everything you sell. Capitalism, ho!', 4)
+  give_kit(s)
 end
 
 -- ── the cellar: Recettear's slimes and mushrooms as monsters of this game ────────────────────────────────────────
@@ -757,20 +810,22 @@ local function install()
   assert(mod.game.map.set_exit(CELLAR, 2, SHOP, 2))
   assert(mod.game.map.set_exit(CELLAR, 3, SHOP, 2))
   make_sounds()
+  define_items()
   define('recette', CODE.recette, 50240, 'Recette')
   define('tear', CODE.tear, 50240, 'Tear')
   local code = 50972
   for _, k in ipairs(KINDS) do
     if A.chars[k.key] then k.code = code; define(k.key, code, 50240, k.name); code = code + 1 end
   end
-  local function monster(name, c, display, hp)     -- a slime underneath: its body, AI and clips; our sheet in its layout
+  local function monster(name, c, display, hp, drops)     -- a slime underneath: its body, AI and clips; our sheet in its layout
     if not A.chars[name] then return end
-    assert(ACT.define { code = c, base = 51010, name = display, hp = hp,
+    assert(ACT.define { code = c, base = 51010, name = display, hp = hp, drops = drops,
       bank = function(p) return char_bank(name, mod.mem.read_u16(p + 0x48), true) end,
       on_death = function() wave.typed = math.max(0, wave.typed - 1) end })
   end
-  monster('slime', CODE.slime, 'Slime', 40)
-  monster('mushroom', CODE.mushroom, 'Walking Mushroom', 70)
+  -- what they drop (per mille; the first through the game's own drop roll): Recettear's items
+  monster('slime', CODE.slime, 'Slime', 40, { { id = IT.sandwich, chance = 350 }, { id = IT.strong, chance = 60 } })
+  monster('mushroom', CODE.mushroom, 'Walking Mushroom', 70, { { id = IT.ferromin, chance = 250 }, { id = IT.sandwich, chance = 250 } })
   S.on_talk(H.RECETTE, recette_talk, { name = 'Recette' })
   S.on_talk(H.TEAR, tear_talk, { name = 'Tear' })
   S.on_tick(function() shop_tick() cellar_tick() end)
@@ -789,7 +844,7 @@ local function install()
   end
   mod.log(('installed: storeroom door (zone %d) -> the branch (room %d), cellar %d; %d goods'):format(DOOR_ZONE, SHOP, CELLAR, #goods()))
 end
-_G.recettear = { A = A, SHOP = SHOP, BACK = BACK, CELLAR = CELLAR, H = H, CODE = CODE, F = F, shop = shop, wave = wave,
+_G.recettear = { A = A, IT = IT, SHOP = SHOP, BACK = BACK, CELLAR = CELLAR, H = H, CODE = CODE, F = F, shop = shop, wave = wave,
                  level = level, stock = stock, set_stock = set_stock, fget = fget, fset = fset, goods = goods,
                  in_stock = in_stock, KINDS = KINDS, banks = banks, faces = faces, face_bank = face_bank }
 install()
