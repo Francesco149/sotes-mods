@@ -781,6 +781,18 @@ local function hall_talk(s)
     say(s, 'recette', ('Back to the Hall of Trials? You have been down %d time%s and reached the bottom %d.'):format(
       fget(hall.F.RUNS), fget(hall.F.RUNS) == 1 and '' or 's', fget(hall.F.CLEARS)), 1)
   end
+  -- room in the bag: this game carries 80 things (clothes apart); a chest that does not fit puts its item back
+  local carried_n = 0
+  for _, it in ipairs(mod.game.items.list() or {}) do
+    if not it.stored then
+      local d = mod.game.items.def(it.id)
+      local slot = d and d.slot or 0
+      if not (slot >= 5 and slot <= 8) then carried_n = carried_n + 1 end
+    end
+  end
+  if 80 - carried_n < 6 then
+    say(s, 'tear', ('Your bag is nearly full: room for %d more. Whatever does not fit stays in the chests. The storage box takes the rest.'):format(math.max(0, 80 - carried_n)), 2)
+  end
   say(s, 'recette', 'Shall we go?', 1)
   if not s:yes_no() then return false end
   say(s, 'recette', 'Good luck! Capitalism, ho!', 4)
@@ -799,6 +811,8 @@ local function welcome_back(s, how)
     s:sound(SFX.fanfare)
     say(s, 'recette', 'You made it all the way to the bottom of the Hall of Trials! Yayifications!', 4)
     say(s, 'tear', 'The guild will be impressed. The Crown Slime was not at home, I hear. Lucky.', 1)
+    say(s, 'tear', 'Word gets around. Expect a few more customers next time we open.')
+    fset(F.TRAFFIC, math.min(60, fget(F.TRAFFIC) + 6))
   elseif how == 'fallen' then
     say(s, 'recette', 'Are you okay?! You look like you got sat on by a slime...', 2)
   else
