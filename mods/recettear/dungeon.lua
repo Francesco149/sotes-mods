@@ -247,6 +247,7 @@ function H.start()
   run.defeats0 = defeats() or 0
   run.floor = 0
   run.banner = nil
+  run.seen = nil
   run.exit_armed = true
   C.fset(F.RUN, run.seed)
   C.fset(F.RUNS, C.fget(F.RUNS) + 1)
@@ -268,20 +269,32 @@ local function home(how)
 end
 
 -- Recettear's rule when the adventurer falls: everything found here is lost, but one item comes home
+-- Two ways back from the game's Game Over: "Return To Safety" loads the save it wrote at the defeat (the bag as it was:
+-- the finds are taken here), "Try Again" the checkpoint retail wrote when the party last left a room by a normal exit —
+-- before this run (the Hall's floors are entered by warps): the finds are gone with it, and the one item Tear saved
+-- is handed back (the run's finds are tracked as it goes: run.seen).
 local function fallen(s)
   local got = finds()
-  local keep
-  local units = 0
+  local keep, units, lost, restored = nil, 0, 0, false
   for _, f in ipairs(got) do units = units + f.n end
-  if units > 0 then
-    local r = math.random(1, units)
+  if units == 0 and run.seen and #run.seen > 0 then got, restored = run.seen, true end
+  local total = 0
+  for _, f in ipairs(got) do total = total + f.n end
+  if total > 0 then
+    local r = math.random(1, total)
     for _, f in ipairs(got) do r = r - f.n if r <= 0 then keep = f break end end
   end
-  local lost = 0
-  for _, f in ipairs(got) do
-    local n = f.n - ((keep and keep.id == f.id) and 1 or 0)
-    if n > 0 then lost = lost + (mod.game.items.take(f.id, n) or 0) end
+  if restored then
+    lost = total - (keep and 1 or 0)
+    if keep then mod.game.items.give(keep.id, 1) end
+  else
+    for _, f in ipairs(got) do
+      local n = f.n - ((keep and keep.id == f.id) and 1 or 0)
+      if n > 0 then lost = lost + (mod.game.items.take(f.id, n) or 0) end
+    end
   end
+  units = total
+  run.seen = nil
   s:sound(C.SFX.fanfare)
   C.say(s, 'tear', 'You fainted in the Hall of Trials. I dragged you out myself. The guild\'s rules: whatever was found down there stays down there.', 2)
   if keep then
@@ -418,6 +431,7 @@ function H.frame()
     return
   end
   local n = floor_of(m.area)
+  if n and run.floor == n and (mod.frame() % 30) == 0 then run.seen = finds() end   -- what the run has found so far
   if n and n ~= run.floor and not mod.game.map.event() and mod.game.map.warp_status() == 'idle' then
     arrive(n)
   elseif not n and run.floor > 0 and m.area ~= C.SHOP and mod.game.map.warp_status() == 'idle' then

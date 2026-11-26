@@ -73,7 +73,8 @@ end
 -- A HEIGHTMAP of pieces: for each column x, the floor's first rock row h[x] and the ceiling's first open row c[x].
 -- What keeps every piece drawable by the tile rules above, and every floor walkable by the party:
 --   * floor and ceiling change only between RUNS at least 2 pieces wide (no rock 1 piece thick sideways)
---   * a floor step is at most 2 pieces (128 px: what a jump clears; 192 px does not — measured with Arche)
+--   * a floor step is at most 2 pieces (128 px: what a jump clears; 192 px does not — measured with Arche), and
+--     going on (left to right) a rise is at most 1 piece: the way to the exit never needs a full jump
 --   * headroom (h - c) at least 4 pieces (256 px), and rock at least 2 pieces thick above and below
 -- The floor is a row of runs; a run is a stretch of level floor 2..7 pieces wide.  Some runs are "chambers" (tall),
 -- some "tunnels" (low ceiling).  Returns g (g[x][y] = rock), W, H and the runs {x0, x1, h, c}.
@@ -84,7 +85,8 @@ function M.layout(opts)
   while x < W - 2 do
     local w = #runs == 0 and rng(5, 7) or rng(2, 7)
     if W - 2 - x - w < 6 then w = W - 2 - x end          -- the last run takes the rest: at least 6 wide
-    if #runs > 0 then floor = math.max(7, math.min(H - 2, floor + ({ -2, -1, -1, 0, 0, 1, 1, 2 })[rng(1, 8)])) end
+    -- going on (to the right) the floor rises at most 1 piece (64 px: any member's hop) and drops up to 2
+    if #runs > 0 then floor = math.max(7, math.min(H - 2, floor + ({ -1, -1, 0, 0, 1, 1, 2 })[rng(1, 7)])) end
     local open = ({ 4, 4, 5, 5, 6, 7, 8 })[rng(1, 7)]
     local c = math.max(2, floor - open)
     runs[#runs + 1] = { x0 = x, x1 = x + w - 1, h = floor, c = c }
