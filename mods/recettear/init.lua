@@ -998,10 +998,10 @@ local function install()
   monster('mushroom', CODE.mushroom, 'Walking Mushroom', 70, { { id = IT.ferromin, chance = 250 }, { id = IT.sandwich, chance = 250 } })
   -- the Hall of Trials' monsters: Recettear's sprites over this game's bodies (green slime, red slime, kobold,
   -- myconid for the roper — a slow ground monster); drops are set per floor (dungeon.lua)
-  -- (HP: Recettear's proportions — 15 / 20 / 20 / 15 there — at this game's beginner scale: a green slime here has 30;
-  -- the red slime underneath is a late-game monster with 150+ of its own)
+  -- (HP: Recettear's proportions — 15 / 20 / 20 / 15 there — at this game's beginner scale: a green slime here has 30)
   monster(A.chars.greenslime and 'greenslime' or 'slime', CODE.hall.slime, 'Green Slime', 30, {}, 51010)
-  monster('redslime', CODE.hall.redslime, 'Red Slime', 45, {}, 51013)
+  monster('redslime', CODE.hall.redslime, 'Red Slime', 45, {}, 51011)   -- (this game's Red Slime is a late monster: its
+                                                                         --  EXP too; the early Blue Slime underneath)
   monster('kobold', CODE.hall.kobold, 'Kobold', 60, {}, 51030)
   monster('roper', CODE.hall.roper, 'Green Roper', 50, {}, 51024)
   if A.chars.circle then define('circle', CODE.circle, 50240, 'Magic Circle') end
