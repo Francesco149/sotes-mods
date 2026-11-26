@@ -6,7 +6,7 @@
     "homepage": "https://github.com/Francesco149/sotes-mods",
     "maintainer": "Francesco149"
   },
-  "_note": "autoload and dashboard have loader-based releases (tags autoload-1.0.0, dashboard-1.0.0, assets hosted on this repo's GitHub releases); ennse_voice is still being ported and trainer (mods/trainer) is unreleased, so their versions[] stay empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
+  "_note": "autoload, dashboard, trainer, recettear and testroom have loader-based releases (tags <id>-<version>, assets hosted on this repo's GitHub releases); ennse_voice is still being ported, so its versions[] stays empty until released. Convention: each mod releases under a `<id>-<version>` git tag on this repo, but a download `url` may point anywhere — a source repo can be registry-only and host files elsewhere. Schema: sotes-mod-loader/docs/REGISTRY.md.",
   "mods": [
     {
       "id": "autoload",
@@ -83,10 +83,133 @@
     {
       "id": "trainer",
       "name": "Trainer",
-      "description": "Cheats + sandbox for every edition (2012 EN, SE EN / JP): god mode, heal, gold, teleport to the cursor, warp to any room, give any item. Each is the game's own mechanism via the loader's mod.game ops (api 1.2). Replaces the injected EN-SE trainer.",
+      "description": "Cheats + sandbox for every edition (2012 EN, SE EN / JP): god mode, heal, gold, dialogue skip, teleport to the cursor, warp to any room, give any item, spawn any character. Each is the game's own mechanism via the loader's mod.game ops. Replaces the injected EN-SE trainer.",
       "keywords": ["trainer", "cheat", "teleport", "god", "warp", "items", "sandbox", "debug"],
       "target_games": ["sotes_en"],
-      "versions": []
+      "versions": [
+        {
+          "version": "0.2.0",
+          "released": "2026-11-26",
+          "notes": "First release (loader api 1.6). God mode, heal, gold, dialogue skip, teleport to the cursor (F7), warp to any room, give any item, spawn any character — on every edition, each through the game's own mechanism via the loader's mod.game ops. Panels in the loader UI.",
+          "min_loader": "0.1.0",
+          "requires": {},
+          "files": [
+            {
+              "kind": "download",
+              "dest": "mods/trainer/init.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/trainer-0.2.0/init.lua",
+              "sha256": "1c5c73d2d7a7f6270a5e58a238b2f55bc5abaf68e8e1b32a0f2b75d4b6b80408",
+              "size": 9780
+            },
+            {
+              "kind": "download",
+              "dest": "mods/trainer/mod.toml",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/trainer-0.2.0/mod.toml",
+              "sha256": "0481fc2d7cb01975ce52d910d331a9b8991d8e2320d0701d64c5712bab6532bc",
+              "size": 1401
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recettear",
+      "name": "Recettear: Tonkiness Branch",
+      "description": "A Recettear crossover: Recette and Tear run a branch of their item shop behind Arche's family shop — wholesale stock, customers who haggle, merchant levels, a loan, Recettear's own items added as new items, and the Hall of Trials (Recettear's first dungeon as a new maze of chambers every visit, with its monsters, treasure and lose-your-finds rule). Needs your own copy of Recettear: its sprites, portraits, icons, tables and music are converted once at first launch.",
+      "keywords": ["recettear", "crossover", "shop", "dungeon", "content", "items"],
+      "target_games": ["sotes_en"],
+      "versions": [
+        {
+          "version": "0.4.0",
+          "released": "2026-11-26",
+          "notes": "First release. Needs loader api 1.13 (the 2026-11-26 nightly or newer). Recette and Tear's shop branch behind Arche's family shop (wholesale stock, haggling, merchant levels, a loan), Recettear's items as new items, and the Hall of Trials. First launch runs a one-time setup that converts sprites, portraits, icons, tables and music from your own Steam copy of Recettear (about 30 MB, into mod_data\\recettear); nothing from Recettear is shipped.",
+          "min_loader": "0.1.0",
+          "requires": {},
+          "files": [
+            {
+              "kind": "download",
+              "dest": "mods/recettear/init.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/recettear-0.4.0/init.lua",
+              "sha256": "2b49d9553aeeeaf1cd106b1114bcdcaec1f789f24ce0cec1a47f640b268e9109",
+              "size": 56322
+            },
+            {
+              "kind": "download",
+              "dest": "mods/recettear/mod.toml",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/recettear-0.4.0/mod.toml",
+              "sha256": "23f380abdff1256bdfa61e22cfae2cb1ff287ea2b91868938cecc450fbe84043",
+              "size": 2073
+            },
+            {
+              "kind": "download",
+              "dest": "mods/recettear/setup.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/recettear-0.4.0/setup.lua",
+              "sha256": "6c7f77d3d301467f37a7e5af0a37fbc88160993947f15e3c226b400f6bf01b2d",
+              "size": 23525
+            },
+            {
+              "kind": "download",
+              "dest": "mods/recettear/dungeon.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/recettear-0.4.0/dungeon.lua",
+              "sha256": "ea21545b52e25245088d3e4273f7ea9b273ad18e2496d146f4a5c95c77a0fc0b",
+              "size": 26347
+            },
+            {
+              "kind": "download",
+              "dest": "mods/recettear/floors.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/recettear-0.4.0/floors.lua",
+              "sha256": "0cedd6efbb17faf179367071813f807886e66bbc7d53e90414234d356a65b6b3",
+              "size": 24077
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "testroom",
+      "name": "Test Room",
+      "description": "Proof of concept for custom content: a new door in Arche's house leads to the Mod Hall, a custom room built from stock tiles where NPCs drive the game's own systems from Lua, plus custom sprites — a recoloured NPC, Bit (a new character type) and the Glitch Cube (a new monster type) in a custom arena.",
+      "keywords": ["testroom", "demo", "custom room", "sprites", "example", "content"],
+      "target_games": ["sotes_en"],
+      "versions": [
+        {
+          "version": "0.4.1",
+          "released": "2026-11-26",
+          "notes": "First release (loader api 1.11). A new door in Arche's house leads to the Mod Hall: a custom room where NPCs drive the game's own systems from Lua (shop, inn, storage, books, warps, synthesized sounds), plus Bit (a new character with his own sprite sheet, animations and dance) and the Glitch Cube (a new monster) in a custom arena. Maps are built at load from your own game data; the only shipped art is the mod's own.",
+          "min_loader": "0.1.0",
+          "requires": {},
+          "files": [
+            {
+              "kind": "download",
+              "dest": "mods/testroom/init.lua",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/testroom-0.4.1/init.lua",
+              "sha256": "0c4b7f4956114982de788709f67e6e8d639af1342bfb5041d2cecc78659ec9f8",
+              "size": 38938
+            },
+            {
+              "kind": "download",
+              "dest": "mods/testroom/mod.toml",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/testroom-0.4.1/mod.toml",
+              "sha256": "72010ffce920b7231d0f6a245c1d6452e78f9047693449c7bd9d66ce55adfaeb",
+              "size": 734
+            },
+            {
+              "kind": "download",
+              "dest": "mods/testroom/bit.bmp",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/testroom-0.4.1/bit.bmp",
+              "sha256": "39adeb1e1908f5d49d417fb9c3818aa2676d2c03003c2d5a0012f48f2c767b14",
+              "size": 246838
+            },
+            {
+              "kind": "download",
+              "dest": "mods/testroom/cube.bmp",
+              "url": "https://github.com/Francesco149/sotes-mods/releases/download/testroom-0.4.1/cube.bmp",
+              "sha256": "9a802f205f2eb1200ffdecf7d07c0f8637e96bbee5f88d0e992b618e8e6be65e",
+              "size": 308278
+            }
+          ]
+        }
+      ]
     }
   ]
 }

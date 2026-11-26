@@ -126,16 +126,16 @@ Special Edition (its automated test passes on all three editions).
 | `dashboard` | Loader Dashboard | The **stock loader UI**: every built-in `mod.game.*` module with an enable/disable toggle (a crash valve), persisted, + live roster stats. Recommended default. |
 | `autoload` | Auto-Load Save | Launch straight into a save (config: `slot`). Orchestrates the loader's `mod.game.save` op. |
 | `ennse_voice` | Japanese Voice Patch (EN-SE) | English text + Japanese dialogue voices. You supply `sotesx_s.dll` from your own JP copy. |
-| `trainer` | Trainer | God mode / heal / gold / teleport to the cursor (F7) / warp to any room / give any item, every edition — over the loader's sandbox ops (api 1.2). Panels in the loader UI; `_G.trainer` for agents. Unreleased (0.1.0). |
-| `recettear` | Recettear: Tonkiness Branch | A Recettear crossover (loader api 1.13): Recette and Tear run a branch of their shop behind Arche's family shop — wholesale stock, customers who haggle, merchant levels, a loan, Recettear's own items added as new items, and the Hall of Trials (Recettear's first dungeon as a new maze of brick halls and caves every visit, with its monsters, treasure and lose-your-finds rule). Sprites, portraits, item icons, tables and music are converted once from your own copy of Recettear. See the showcase above. Unreleased (0.4.0). |
-| `testroom` | Test Room | Proof of concept for custom content (loader api 1.10): a new door in Arche's house leads to the Mod Hall, a new room built from stock tiles where NPCs drive the game's own systems from Lua (shop, inn, books, warps, synthesized sounds), plus custom sprites — a recoloured NPC, Bit (a new character type under its own code, placed by the map: own sprite sheet + animations + a 13-second dance to his own tune) and the Glitch Cube (a new monster type: own sheet + Lua behaviours). The custom sprites live in sprite banks past the game's own. Maps are built at load from your own game data; the only shipped art is the mod's own (`bit.bmp`, `cube.bmp`, drawn by `art/make_art.py`). Unreleased (0.4.1). |
+| `trainer` | Trainer | God mode / heal / gold / teleport to the cursor (F7) / warp to any room / give any item, every edition — over the loader's sandbox ops (api 1.6). Panels in the loader UI; `_G.trainer` for agents. Released: `trainer-0.2.0`. |
+| `recettear` | Recettear: Tonkiness Branch | A Recettear crossover (loader api 1.13): Recette and Tear run a branch of their shop behind Arche's family shop — wholesale stock, customers who haggle, merchant levels, a loan, Recettear's own items added as new items, and the Hall of Trials (Recettear's first dungeon as a new maze of brick halls and caves every visit, with its monsters, treasure and lose-your-finds rule). Sprites, portraits, item icons, tables and music are converted once from your own copy of Recettear. See the showcase above. Released: `recettear-0.4.0` (needs the 2026-11-26 loader nightly or newer). |
+| `testroom` | Test Room | Proof of concept for custom content (loader api 1.11): a new door in Arche's house leads to the Mod Hall, a new room built from stock tiles where NPCs drive the game's own systems from Lua (shop, inn, books, warps, synthesized sounds), plus custom sprites — a recoloured NPC, Bit (a new character type under its own code, placed by the map: own sprite sheet + animations + a 13-second dance to his own tune) and the Glitch Cube (a new monster type: own sheet + Lua behaviours). The custom sprites live in sprite banks past the game's own. Maps are built at load from your own game data; the only shipped art is the mod's own (`bit.bmp`, `cube.bmp`, drawn by `art/make_art.py`). Released: `testroom-0.4.1`. |
 
 ## Status
 
-**WIP.** `autoload` and `dashboard` have loader-based releases (`autoload-1.0.0`,
-`dashboard-1.0.0`); `ennse_voice` is still being **ported** from `../OpenSummoners/tools/ennse_voice`; `trainer`
-(the v2 rewrite of `../OpenSummoners/tools/sotes_trainer`) is in `mods/trainer` — both keep
-`registry.json` `versions[]` empty until released.
+**WIP.** `autoload`, `dashboard`, `trainer`, `recettear` and `testroom` have loader-based releases
+(`autoload-1.0.0`, `dashboard-1.0.0`, `trainer-0.2.0`, `recettear-0.4.0`, `testroom-0.4.1`); `ennse_voice` is
+still being **ported** from `../OpenSummoners/tools/ennse_voice` and keeps `registry.json` `versions[]` empty
+until released.
 
 ## Releases
 
